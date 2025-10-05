@@ -1,0 +1,34 @@
+experiment_params:
+  num_episodes: 20
+  trials_per_episode: 50
+  agents_per_condition: 50
+
+baseline:
+  policy_params:
+    learning_rate: 0.1
+    gamma: 0.6
+    epsilon: 0.5
+    temperature: 1.0
+  dopamine_modulation:
+    scaling: 1.0
+    sensitivity: 1.0
+
+depleted:
+  policy_params:
+    learning_rate: 0.05     # slower learning
+    gamma: 0.9              # much more future-oriented
+    epsilon: 0.6            # encourage more random trial and error (exploration)
+    temperature: 1.2
+  dopamine_modulation:
+    scaling: 0.5            # weaker RPE signal
+    sensitivity: 1.5        # punishments hit harder
+
+overactive:
+  policy_params:
+    learning_rate: 0.15
+    gamma: 0.3              # much more inclined to value immediate rewards
+    epsilon: 0.1            # much greedier exploitation (less exploration)
+    temperature: 0.8
+  dopamine_modulation:
+    scaling: 1.5            # exaggerated RPE signal
+    sensitivity: 0.5        # punishments down-weighted
