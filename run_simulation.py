@@ -206,9 +206,9 @@ def main() -> None:
     """
     conditions = [None, "depleted", "overactive"]
     seeds = list(range(10))
-    agents_per_condition = config["experiment_params"].get("agents_per_condition", 10)
-    num_episodes = config["experiment_params"].get("num_episodes", 20)
-    trials_per_episode = config["experiment_params"].get("trials_per_episode", 200)
+    agents_per_condition = config["experiment_params"].get("agents_per_condition", 50)
+    num_episodes = config["experiment_params"].get("num_episodes", 10)
+    trials_per_episode = config["experiment_params"].get("trials_per_episode", 20)
     master_log = []
 
     for cond in conditions:

@@ -1,6 +1,6 @@
 experiment_params:
-  num_episodes: 20
-  trials_per_episode: 50
+  num_episodes: 10
+  trials_per_episode: 20
   agents_per_condition: 50
 
 baseline:
