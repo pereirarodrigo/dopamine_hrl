@@ -1,6 +1,7 @@
-from yaml import safe_load
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
+from yaml import safe_load
 from src.modelling.environment import IGTEnv
 from src.modelling.modulation import DopamineModulation
 from src.modelling.agent import (
@@ -144,7 +145,7 @@ def run_condition(seed, dysfunction: str = None, agent_id: int = 1, n_episodes: 
     env = IGTEnv(max_steps = n_episodes * n_trials_per_ep)
 
     # Load parameters from config
-    params = config["baseline"] if dysfunction is None else config[dysfunction]
+    params = config["healthy"] if dysfunction is None else config[dysfunction]
 
     # Initialise base policy parameters
     base_alpha = params["policy_params"].get("learning_rate", 0.1)
@@ -204,7 +205,7 @@ def main() -> None:
     """
     Execute experiments across multiple seeds and conditions, save results for analysis.
     """
-    conditions = [None, "depleted", "overactive"]
+    conditions = [None, "overactive", "depleted"]
     seeds = list(range(10))
     agents_per_condition = config["experiment_params"].get("agents_per_condition", 50)
     num_episodes = config["experiment_params"].get("num_episodes", 10)
@@ -212,8 +213,12 @@ def main() -> None:
     master_log = []
 
     for cond in conditions:
-        for s in seeds:
-            for agent in range(agents_per_condition):
+        condition_name = cond if cond is not None else "healthy"
+
+        print(f"\nRunning condition: {condition_name}")
+
+        for s in tqdm(seeds, desc = f"Seeds ({condition_name})"):
+            for agent in tqdm(range(agents_per_condition), desc = f"Agents ({condition_name}, seed = {s})", leave=False):
                 df = run_condition(
                     seed = s, 
                     dysfunction = cond, 
@@ -221,6 +226,7 @@ def main() -> None:
                     n_episodes = num_episodes, 
                     n_trials_per_ep = trials_per_episode
                 )
+
                 master_log.append(df)
 
         # Save each condition separately for clarity

@@ -54,9 +54,9 @@ def compute_summary(dataframe: pd.DataFrame, n_blocks: int = 4) -> tuple[pd.Data
     # Deck preferences
     deck_pref = (
         dataframe.groupby(["condition", "agent", "episode", "block"])["deck"]
-        .value_counts(normalize=True)
-        .unstack(fill_value=0)
-        .rename(columns={0: "A", 1: "B", 2: "C", 3: "D"})
+        .value_counts(normalize = True)
+        .unstack(fill_value = 0)
+        .rename(columns = {0: "A", 1: "B", 2: "C", 3: "D"})
         .reset_index()
     )
     deck_pref["advantage_index"] = (deck_pref["C"] + deck_pref["D"]) - (deck_pref["A"] + deck_pref["B"])
@@ -108,7 +108,7 @@ def compute_blockwise_winlose(dataframe: pd.DataFrame, n_blocks: int = 4) -> pd.
 
     df_sorted = dataframe.sort_values(["condition", "agent", "episode", "trial"]).copy()
     df_sorted["block"] = df_sorted.groupby(["condition", "agent", "episode"])["trial"].transform(
-        lambda x: pd.cut(x, bins=bins, labels=range(1, n_blocks + 1), include_lowest=True).astype(int)
+        lambda x: pd.cut(x, bins = bins, labels = range(1, n_blocks + 1), include_lowest = True).astype(int)
     )
 
     # Previous reward and choice
