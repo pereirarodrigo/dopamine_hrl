@@ -1,4 +1,5 @@
 experiment_params:
+  num_seeds: 20
   num_episodes: 20
   trials_per_episode: 40
   agents_per_condition: 50
@@ -28,7 +29,7 @@ depleted:
     learning_rate: 0.05     # slower learning
     gamma: 1.0              # completely future-oriented
     epsilon: 1.0            # completely random (exploration), no exploitation
-    temperature: 1.5        # more randomness in action selection
+    temperature: 2.0        # much more randomness in action selection
   dopamine_modulation:
     scaling: 0.5            # weaker RPE signal
-    sensitivity: 1.5        # punishments hit harder
+    sensitivity: 2.0        # punishments hit harder

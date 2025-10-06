@@ -80,16 +80,6 @@ def run_episode(
         # Dopamine and RPE calculations
         expected = np.mean(high_policy.q_table[state])
         rpe = dopamine_mod.prediction_error(expected, reward, scaling = reward_scaling)
-
-        # Asymmetric RPE scaling (for biological realism)
-        # Exaggerated response
-        if dopamine_mod.has_dysfunction == "overactive":
-            rpe = rpe * (1.0 + abs(rpe) * 0.001)
-        
-        # Blunted response
-        elif dopamine_mod.has_dysfunction == "depleted":
-            rpe = rpe * 0.5
-
         dop_level = dopamine_mod.update_dopamine(reward, rpe, sensitivity = punishment_sensitivity)
 
         # Policy updates
@@ -206,7 +196,7 @@ def main() -> None:
     Execute experiments across multiple seeds and conditions, save results for analysis.
     """
     conditions = [None, "overactive", "depleted"]
-    seeds = list(range(10))
+    seeds = list(range(config["experiment_params"].get("num_seeds", 10)))
     agents_per_condition = config["experiment_params"].get("agents_per_condition", 50)
     num_episodes = config["experiment_params"].get("num_episodes", 10)
     trials_per_episode = config["experiment_params"].get("trials_per_episode", 20)
@@ -218,7 +208,7 @@ def main() -> None:
         print(f"\nRunning condition: {condition_name}")
 
         for s in tqdm(seeds, desc = f"Seeds ({condition_name})"):
-            for agent in tqdm(range(agents_per_condition), desc = f"Agents ({condition_name}, seed = {s})", leave=False):
+            for agent in tqdm(range(agents_per_condition), desc = f"Agents ({condition_name}, seed = {s})", leave = False):
                 df = run_condition(
                     seed = s, 
                     dysfunction = cond, 
