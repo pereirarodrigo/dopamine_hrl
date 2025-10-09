@@ -43,7 +43,7 @@ def plot_advantage_trend(dataframe: pd.DataFrame, output_path: str, filename: st
 
     plt.title("Advantageous Deck Preference over Time", fontsize = 12)
     plt.xlabel("Block")
-    plt.ylabel("(C + D) - (A + B)")
+    plt.ylabel("Positive = more advantageous")
     plt.legend(title = "Condition")
     plt.grid(alpha = 0.3)
     plt.tight_layout()
@@ -83,7 +83,7 @@ def plot_advantage_trend_with_agents(dataframe: pd.DataFrame, output_path: str, 
 
     plt.title("Advantageous Deck Preference over Time (By Agent)", fontsize = 12)
     plt.xlabel("Block")
-    plt.ylabel("(C + D) - (A + B)")
+    plt.ylabel("Positive = more advantageous")
     plt.legend(title = "Condition")
     plt.grid(alpha = 0.3)
     plt.tight_layout()
