@@ -1,37 +1,21 @@
+import os
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from yaml import safe_load
 from src.modelling.environment import IGTEnv
+from src.utils import compute_deck_preferences
 from src.modelling.modulation import DopamineModulation
 from src.modelling.agent import (
-    TDPolicy, 
-    RandomPolicy,
+    SoftmaxPolicy,
     DopamineTDPolicy, 
-    SigmoidTermination,
-    SoftmaxPolicy
+    SigmoidTermination
 )
 
 
 # Simulation parameters
 with open("default_params.yaml", "r") as f:
     config = safe_load(f)
-
-
-def compute_deck_preferences(dataframe: pd.DataFrame) -> pd.DataFrame:
-    """
-    Compute deck preferences and advantage index for each agent in the dataframe.
-    """
-    prefs = (
-        dataframe.groupby(["agent", "condition"])["deck"]
-        .value_counts(normalize = True)
-        .unstack(fill_value = 0)
-        .rename(columns = {0: "A", 1: "B", 2: "C", 3: "D"})
-        .reset_index()
-    )
-    prefs["advantage_index"] = (prefs["C"] + prefs["D"]) - (prefs["A"] + prefs["B"])
-
-    return prefs
 
 
 def run_episode(
@@ -193,14 +177,18 @@ def run_condition(seed, dysfunction: str = None, agent_id: int = 1, n_episodes: 
 
 def main() -> None:
     """
-    Execute experiments across multiple seeds and conditions, save results for analysis.
+    Execute experiments across multiple seeds and conditions, then save results for analysis.
     """
     conditions = [None, "overactive", "depleted"]
     seeds = list(range(config["experiment_params"].get("num_seeds", 10)))
     agents_per_condition = config["experiment_params"].get("agents_per_condition", 50)
     num_episodes = config["experiment_params"].get("num_episodes", 10)
     trials_per_episode = config["experiment_params"].get("trials_per_episode", 20)
+    save_path = config["experiment_params"].get("hrl_exp_save_path", "logs/hrl")
     master_log = []
+
+    # Create save directory if it doesn't exist
+    os.makedirs(save_path, exist_ok = True)
 
     for cond in conditions:
         condition_name = cond if cond is not None else "healthy"
@@ -223,12 +211,12 @@ def main() -> None:
         condition_name = cond if cond is not None else "healthy"
         results = pd.concat(master_log, ignore_index = True)
 
-        results.to_csv(f"logs/igt_dopamine_hrl_results_{condition_name}.csv", index = False)
+        results.to_csv(f"{save_path}/igt_dopamine_hrl_results_{condition_name}.csv", index = False)
 
         # Save deck preferences summary
         prefs = compute_deck_preferences(results)
 
-        prefs.to_csv(f"logs/igt_dopamine_hrl_deck_prefs_{condition_name}.csv", index = False)
+        prefs.to_csv(f"{save_path}/igt_dopamine_hrl_deck_prefs_{condition_name}.csv", index = False)
         
         print(f"Completed: {condition_name} ({len(seeds)} seeds x {agents_per_condition} agents x {num_episodes * trials_per_episode} trials)")
         

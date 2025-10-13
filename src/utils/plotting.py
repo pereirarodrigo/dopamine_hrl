@@ -3,11 +3,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-
-
-# Paths and settings
-OUTPUT_PATH = "analysis"
-os.makedirs(OUTPUT_PATH, exist_ok = True)
+from src.utils import compute_blockwise_reward_gain
 
 
 def plot_advantage_trend(dataframe: pd.DataFrame, output_path: str, filename: str) -> None:
@@ -40,6 +36,9 @@ def plot_advantage_trend(dataframe: pd.DataFrame, output_path: str, filename: st
             alpha = 0.2,
             color = palette.get(cond, None)
         )
+
+    # Create path if it doesn't exist
+    os.makedirs(output_path, exist_ok = True)
 
     plt.title("Advantageous Deck Preference over Time", fontsize = 12)
     plt.xlabel("Block")
@@ -81,6 +80,9 @@ def plot_advantage_trend_with_agents(dataframe: pd.DataFrame, output_path: str, 
             alpha = 0.25
         )
 
+    # Create path if it doesn't exist
+    os.makedirs(output_path, exist_ok = True)
+
     plt.title("Advantageous Deck Preference over Time (By Agent)", fontsize = 12)
     plt.xlabel("Block")
     plt.ylabel("Positive = more advantageous")
@@ -119,6 +121,9 @@ def plot_blockwise_winlose_trend(dataframe: pd.DataFrame, output_path: str, file
         errorbar = "se"
     )
 
+    # Create path if it doesn't exist
+    os.makedirs(output_path, exist_ok = True)
+
     plt.title("Behavioural Adaptation over Time (Win-Stay/Lose-Shift)", fontsize = 12)
     plt.xlabel("Block")
     plt.ylabel("Mean Probability")
@@ -154,6 +159,9 @@ def plot_blockwise_reward_trend(dataframe: pd.DataFrame, output_path: str, filen
             color = palette.get(cond)
         )
 
+    # Create path if it doesn't exist
+    os.makedirs(output_path, exist_ok = True)
+
     plt.title("Blockwise Cumulative Reward Trend", fontsize = 12)
     plt.xlabel("Block")
     plt.ylabel("Mean Cumulative Reward")
@@ -162,36 +170,6 @@ def plot_blockwise_reward_trend(dataframe: pd.DataFrame, output_path: str, filen
     plt.tight_layout()
     plt.savefig(f"{output_path}/{filename}.png", dpi = 300)
     plt.close()
-
-
-def compute_blockwise_reward_gain(dataframe: pd.DataFrame, n_blocks: int = 4) -> pd.DataFrame:
-    """
-    Compute mean cumulative reward per block and derive block-to-block reward gains (delta of reward) to visualise 
-    learning improvement across conditions.
-    """
-    # Determine bin edges dynamically
-    max_trials = dataframe["trial"].max()
-    block_size = max_trials / n_blocks
-    bins = [i * block_size for i in range(n_blocks + 1)]
-    bins[-1] = np.ceil(max_trials)
-
-    # Assign blocks
-    dataframe = dataframe.copy()
-    dataframe["block"] = dataframe.groupby(["condition", "agent", "episode"])["trial"].transform(
-        lambda x: pd.cut(x, bins = bins, labels=range(1, n_blocks + 1), include_lowest = True).astype(int)
-    )
-
-    # Compute cumulative reward per block
-    block_reward = (
-        dataframe.groupby(["condition", "agent", "block"])["reward"]
-        .sum()
-        .reset_index(name = "block_reward")
-    )
-
-    # Compute reward gain (reward delta) between blocks
-    block_reward["delta_reward"] = block_reward.groupby(["condition", "agent"])["block_reward"].diff().fillna(0)
-
-    return block_reward
 
 
 def plot_reward_gain_trend(dataframe: pd.DataFrame, output_path: str, filename: str) -> None:
@@ -217,6 +195,9 @@ def plot_reward_gain_trend(dataframe: pd.DataFrame, output_path: str, filename: 
             alpha = 0.25
         )
 
+    # Create path if it doesn't exist
+    os.makedirs(output_path, exist_ok = True)
+
     plt.title("Blockwise Learning Gain (Δ Reward)", fontsize=12)
     plt.xlabel("Block")
     plt.ylabel("Δ Mean Reward from Previous Block")
@@ -227,15 +208,27 @@ def plot_reward_gain_trend(dataframe: pd.DataFrame, output_path: str, filename: 
     plt.close()
 
 
-def plot_metric(dataframe: pd.DataFrame, x: pd.Series, y: pd.Series, hue: str, title: str, ylabel: str, filename: str) -> None:
+def plot_metric(
+    dataframe: pd.DataFrame, 
+    x: pd.Series, 
+    y: pd.Series,
+    hue: str, 
+    title: str, 
+    ylabel: str, 
+    filename: str,
+    output_path: str
+) -> None:
     """
     Plot a given metric with error bars.
     """
+    # Create path if it doesn't exist
+    os.makedirs(output_path, exist_ok = True)
+
     plt.figure(figsize = (7, 5))
     sns.barplot(data = dataframe, x = x, y = y, hue = hue, errorbar = "sd", alpha = 0.8)
     plt.title(title, fontsize = 12)
     plt.ylabel(ylabel)
     plt.tight_layout()
-    plt.savefig(f"{OUTPUT_PATH}/{filename}.png", dpi = 300)
+    plt.savefig(f"{output_path}/{filename}.png", dpi = 300)
     plt.close()
 

@@ -1,31 +1,54 @@
 import os
 import numpy as np
 import pandas as pd
-from src.utils.plotting import (
+from yaml import safe_load
+from src.utils import (
     plot_metric,
     plot_advantage_trend,
     plot_reward_gain_trend,
+    compute_blockwise_winlose,
     plot_blockwise_reward_trend,
+    compute_block_reward_per_ep,
     plot_blockwise_winlose_trend,
     compute_blockwise_reward_gain,
     plot_advantage_trend_with_agents
 )
 
-# Paths and settings
-DATA_PATH = "logs"
+
+# Simulation parameters
+with open("default_params.yaml", "r") as f:
+    config = safe_load(f)
+
+HRL_DATA_PATH = config["experiment_params"].get("hrl_exp_save_path", "logs/hrl")
+RND_BASELINE_DATA_PATH = config["experiment_params"].get("rnd_exp_save_path", "logs/baseline/random")
+FLAT_TD_DATA_PATH = config["experiment_params"].get("flat_td_exp_save_path", "logs/baseline/flat_td")
 OUTPUT_PATH = "analysis"
-os.makedirs(OUTPUT_PATH, exist_ok = True)
+
 
 conditions = ["healthy", "depleted", "overactive"]
 
 
-def load_condition_data(cond: str) -> pd.DataFrame:
+def load_condition_data(cond: str, is_baseline: bool = False, is_random: bool = False) -> tuple[pd.DataFrame, str]:
     """
     Load data for a specific condition.
     """
-    path = f"{DATA_PATH}/igt_dopamine_hrl_results_{cond}.csv"
+    if not is_baseline and is_random:
+        raise ValueError("To load the random baseline results, `is_baseline` must be set to True.")
 
-    return pd.read_csv(path)
+    if not is_baseline:
+        path = f"{HRL_DATA_PATH}/igt_dopamine_hrl_results_{cond}.csv"
+        exp_type = "hrl"
+
+    else:
+        if is_random:
+            path = f"{RND_BASELINE_DATA_PATH}/igt_random_results_{cond}.csv"
+            exp_type = "baseline/random"
+
+        else:
+            path = f"{FLAT_TD_DATA_PATH}/igt_flat_td_results_{cond}.csv"
+            exp_type = "baseline/flat_td"
+
+    return pd.read_csv(path), exp_type
 
 
 def compute_summary(dataframe: pd.DataFrame, n_blocks: int = 4) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -96,177 +119,163 @@ def compute_summary(dataframe: pd.DataFrame, n_blocks: int = 4) -> tuple[pd.Data
     return deck_pref, winlose, final_perf
 
 
-def compute_blockwise_winlose(dataframe: pd.DataFrame, n_blocks: int = 4) -> pd.DataFrame:
+def plot_all_results(
+    deck_all: pd.DataFrame, 
+    winlose_all: pd.DataFrame, 
+    perf_all: pd.DataFrame, 
+    output_path: str,
+    is_baseline: bool = False,
+    is_random: bool = False,
+) -> None:
     """
-    Compute blockwise win-stay and lose-shift probabilities for each agent and condition.
+    Generate and save all plots based on the analysis results.
     """
-    # Determine bin edges dynamically
-    max_trials = dataframe["trial"].max()
-    block_size = max_trials / n_blocks
-    bins = [i * block_size for i in range(n_blocks + 1)]
-    bins[-1] = np.ceil(max_trials)
+    blockwise_all, block_reward_all, reward_gain_all = [], [], []
 
-    df_sorted = dataframe.sort_values(["condition", "agent", "episode", "trial"]).copy()
-    df_sorted["block"] = df_sorted.groupby(["condition", "agent", "episode"])["trial"].transform(
-        lambda x: pd.cut(x, bins = bins, labels = range(1, n_blocks + 1), include_lowest = True).astype(int)
+    # Calculate all important metrics beforehand
+    for cond in conditions:
+        data, _ = load_condition_data(cond, is_baseline, is_random)
+        blockwise = compute_blockwise_winlose(data)
+
+        # Compute blockwise reward gain
+        reward_gain = compute_blockwise_reward_gain(data)
+
+        # Compute block reward per episode (for plotting purposes)
+        block_reward = compute_block_reward_per_ep(data)
+
+        blockwise_all.append(blockwise)
+        reward_gain_all.append(reward_gain)
+        block_reward_all.append(block_reward)
+
+    # Save block reward, blockwise winlose, and reward gain data
+    block_reward_all = pd.concat(block_reward_all, ignore_index = True)
+    block_reward_all.to_csv(f"{output_path}/blockwise_reward_trend.csv", index = False)
+
+    blockwise_all = pd.concat(blockwise_all, ignore_index = True)
+    blockwise_all.to_csv(f"{output_path}/blockwise_winlose.csv", index = False)
+
+    reward_gain_all = pd.concat(reward_gain_all, ignore_index = True)
+    reward_gain_all.to_csv(f"{output_path}/blockwise_reward_gain.csv", index = False)
+
+    # Plot results
+    # 1. Block-wise advantage index trend
+    plot_advantage_trend(
+        deck_all,
+        output_path = output_path,
+        filename = "advantage_index_trend"
     )
 
-    # Previous reward and choice
-    df_sorted["prev_reward"] = df_sorted.groupby(["condition", "agent", "episode"])["reward"].shift(1)
-    df_sorted["prev_deck"] = df_sorted.groupby(["condition", "agent", "episode"])["deck"].shift(1)
-
-    # Outcome classification
-    df_sorted["reward_outcome"] = df_sorted["prev_reward"].apply(lambda r: "win" if pd.notnull(r) and r > 0 else "lose")
-
-    df_sorted["win_stay"] = (
-        (df_sorted["reward_outcome"] == "win") &
-        (df_sorted["deck"] == df_sorted["prev_deck"])
-    ).astype(int)
-
-    df_sorted["lose_shift"] = (
-        (df_sorted["reward_outcome"] == "lose") &
-        (df_sorted["deck"] != df_sorted["prev_deck"])
-    ).astype(int)
-
-    # Aggregate per block
-    blockwise = (
-        df_sorted.groupby(["condition", "agent", "block"])[["win_stay", "lose_shift"]]
-        .mean()
-        .reset_index()
+    # 2. Block-wise advantage index trend by agent
+    plot_advantage_trend_with_agents(
+        deck_all,
+        output_path = output_path,
+        filename = "advantage_index_trend_agent"
     )
 
-    return blockwise
-
-
-# Main analysis section
-deck_all, winlose_all, perf_all = [], [], []
-
-for cond in conditions:
-    data = load_condition_data(cond)
-    deck_pref, winlose, final_perf = compute_summary(data)
-    
-    deck_all.append(deck_pref)
-    winlose_all.append(winlose)
-    perf_all.append(final_perf)
-
-deck_all = pd.concat(deck_all, ignore_index = True)
-winlose_all = pd.concat(winlose_all, ignore_index = True)
-perf_all = pd.concat(perf_all, ignore_index = True)
-
-# Save all dataframes
-deck_all.to_csv(f"{OUTPUT_PATH}/deck_preferences.csv", index = False)
-winlose_all.to_csv(f"{OUTPUT_PATH}/winlose_rates.csv", index = False)
-perf_all.to_csv(f"{OUTPUT_PATH}/final_performance.csv", index = False)
-
-# Plot results
-# 1. Block-wise advantage index trend
-plot_advantage_trend(
-    deck_all,
-    output_path = OUTPUT_PATH,
-    filename = "advantage_index_trend"
-)
-
-# 2. Block-wise advantage index trend by agent
-plot_advantage_trend_with_agents(
-    deck_all,
-    output_path = OUTPUT_PATH,
-    filename = "advantage_index_trend_agent"
-)
-
-# 3. Win-stay / Lose-shift
-melted_winlose = winlose_all.melt(
-    id_vars = ["condition", "agent"],
-    value_vars = ["win_stay_rate", "lose_shift_rate"],
-    var_name = "metric",
-    value_name = "rate"
-)
-plot_metric(
-    melted_winlose,
-    x = "metric",
-    y = "rate",
-    hue = "condition",
-    title = "Win-Stay/Lose-Shift Rates by Condition",
-    ylabel = "Mean Probability",
-    filename = "winlose_rates"
-)
-
-# 4. Blockwise win-stay/lose-shift trends
-blockwise_all = []
-
-for cond in conditions:
-    data = load_condition_data(cond)
-    blockwise = compute_blockwise_winlose(data)
-    blockwise_all.append(blockwise)
-
-blockwise_all = pd.concat(blockwise_all, ignore_index = True)
-blockwise_all.to_csv(f"{OUTPUT_PATH}/blockwise_winlose.csv", index = False)
-
-plot_blockwise_winlose_trend(
-    blockwise_all,
-    output_path = OUTPUT_PATH,
-    filename = "blockwise_winlose_trend"
-)
-
-# 5. Final performance
-plot_metric(
-    perf_all,
-    x = "condition",
-    y = "total_reward",
-    hue = None,
-    title = "Final Cumulative Reward per Condition",
-    ylabel = "Total Reward",
-    filename = "final_performance"
-)
-
-# 6. Block-wise cumulative reward trend (learning progression)
-block_reward_all = []
-
-for cond in conditions:
-    data = load_condition_data(cond)
-
-    # Determine block membership per agent and episode
-    max_trials = data["trial"].max()
-    n_blocks = 4
-    block_size = max_trials / n_blocks
-    bins = [i * block_size for i in range(n_blocks + 1)]
-    bins[-1] = np.ceil(max_trials)
-
-    data["block"] = data.groupby(["condition", "agent", "episode"])["trial"].transform(
-        lambda x: pd.cut(x, bins = bins, labels = range(1, n_blocks + 1), include_lowest = True).astype(int)
+    # 3. Win-stay / Lose-shift
+    melted_winlose = winlose_all.melt(
+        id_vars = ["condition", "agent"],
+        value_vars = ["win_stay_rate", "lose_shift_rate"],
+        var_name = "metric",
+        value_name = "rate"
+    )
+    plot_metric(
+        melted_winlose,
+        x = "metric",
+        y = "rate",
+        hue = "condition",
+        title = "Win-Stay/Lose-Shift Rates by Condition",
+        ylabel = "Mean Probability",
+        filename = "winlose_rates",
+        output_path = output_path
     )
 
-    # Average cumulative reward per block
-    block_reward = (
-        data.groupby(["condition", "agent", "block"])["cumulative_reward"]
-        .mean()
-        .reset_index()
+    # 4. Blockwise win-stay/lose-shift trends
+    plot_blockwise_winlose_trend(
+        blockwise_all,
+        output_path = output_path,
+        filename = "blockwise_winlose_trend"
     )
-    block_reward_all.append(block_reward)
 
-block_reward_all = pd.concat(block_reward_all, ignore_index = True)
-block_reward_all.to_csv(f"{OUTPUT_PATH}/blockwise_reward_trend.csv", index = False)
+    # 5. Final performance
+    plot_metric(
+        perf_all,
+        x = "condition",
+        y = "total_reward",
+        hue = None,
+        title = "Final Cumulative Reward per Condition",
+        ylabel = "Total Reward",
+        filename = "final_performance",
+        output_path = output_path
+    )
 
-plot_blockwise_reward_trend(
-    block_reward_all,
-    output_path = OUTPUT_PATH,
-    filename = "blockwise_reward_trend"
-)
+    # 6. Block-wise cumulative reward trend (learning progression)
+    plot_blockwise_reward_trend(
+        block_reward_all,
+        output_path = output_path,
+        filename = "blockwise_reward_trend"
+    )
 
-# 7. Learning gain (reward delta) over time
-reward_gain_all = []
+    # 7. Learning gain (reward delta) over time
+    plot_reward_gain_trend(
+        reward_gain_all,
+        output_path = output_path,
+        filename = "blockwise_reward_gain_trend"
+    )
 
-for cond in conditions:
-    data = load_condition_data(cond)
-    reward_gain = compute_blockwise_reward_gain(data)
-    reward_gain_all.append(reward_gain)
+    print(f"Analysis complete. Results and plots saved in: {output_path}")
 
-reward_gain_all = pd.concat(reward_gain_all, ignore_index = True)
-reward_gain_all.to_csv(f"{OUTPUT_PATH}/blockwise_reward_gain.csv", index = False)
 
-plot_reward_gain_trend(
-    reward_gain_all,
-    output_path = OUTPUT_PATH,
-    filename = "blockwise_reward_gain_trend"
-)
+def run_analysis(is_baseline: bool = False, is_random: bool = False) -> None:
+    """
+    Run full analysis pipeline and generate plots.
+    """
+    data = pd.DataFrame({})
+    deck_all, winlose_all, perf_all = [], [], []
+    exp_type = ''
 
-print(f"Analysis complete. Results and plots saved in: {OUTPUT_PATH}")
+    for cond in conditions:
+        data, exp_type = load_condition_data(cond, is_baseline, is_random)
+        deck_pref, winlose, final_perf = compute_summary(data)
+        
+        deck_all.append(deck_pref)
+        winlose_all.append(winlose)
+        perf_all.append(final_perf)
+
+    deck_all = pd.concat(deck_all, ignore_index = True)
+    winlose_all = pd.concat(winlose_all, ignore_index = True)
+    perf_all = pd.concat(perf_all, ignore_index = True)
+
+    # Append experiment type to output path, and create directory if it doesn't exist
+    output_path = os.path.join(OUTPUT_PATH, exp_type)
+
+    os.makedirs(output_path, exist_ok = True)
+
+    # Save all dataframes depending on experiment type
+    deck_all.to_csv(f"{output_path}/deck_preferences.csv", index = False)
+    winlose_all.to_csv(f"{output_path}/winlose_rates.csv", index = False)
+    perf_all.to_csv(f"{output_path}/final_performance.csv", index = False)
+
+    # Generate and save plots
+    plot_all_results(
+        deck_all, 
+        winlose_all, 
+        perf_all,
+        output_path,
+        is_baseline,
+        is_random
+    )
+
+
+if __name__ == "__main__":
+    # Run analysis for HRL model
+    print("Starting analysis for the HRL model...")
+    run_analysis(is_baseline = False)
+
+    # Run analysis for flat TD baseline
+    print("\nStarting analysis for the flat TD baseline...")
+    run_analysis(is_baseline = True, is_random = False)
+
+    # Run analysis for random baseline
+    print("\nStarting analysis for the random baseline...")
+    run_analysis(is_baseline = True, is_random = True)
