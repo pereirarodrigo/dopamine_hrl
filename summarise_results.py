@@ -210,7 +210,7 @@ def plot_all_results(
         output_path = output_path
     )
 
-    # 6. Block-wise cumulative reward trend (learning progression)
+    # 6. Blockwise cumulative reward trend (learning progression)
     plot_blockwise_reward_trend(
         block_reward_all,
         output_path = output_path,
