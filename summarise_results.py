@@ -252,7 +252,7 @@ def run_analysis(is_baseline: bool = False, is_random: bool = False) -> None:
 
     os.makedirs(output_path, exist_ok = True)
 
-    # Save all dataframes depending on experiment type
+    # Save all dataframes
     deck_all.to_csv(f"{output_path}/deck_preferences.csv", index = False)
     winlose_all.to_csv(f"{output_path}/winlose_rates.csv", index = False)
     perf_all.to_csv(f"{output_path}/final_performance.csv", index = False)
