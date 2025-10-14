@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from src.utils import compute_blockwise_reward_gain
+from src.utils.deck import compute_blockwise_reward_gain
 
 
 def plot_advantage_trend(dataframe: pd.DataFrame, output_path: str, filename: str) -> None:

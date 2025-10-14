@@ -2,18 +2,19 @@ import os
 import numpy as np
 import pandas as pd
 from yaml import safe_load
-from src.utils import (
+from src.utils.deck import (
+    compute_blockwise_winlose,
+    compute_block_reward_per_ep,
+    compute_blockwise_reward_gain
+)
+from src.utils.plotting import (
     plot_metric,
     plot_advantage_trend,
     plot_reward_gain_trend,
-    compute_blockwise_winlose,
     plot_blockwise_reward_trend,
-    compute_block_reward_per_ep,
     plot_blockwise_winlose_trend,
-    compute_blockwise_reward_gain,
     plot_advantage_trend_with_agents
 )
-
 
 # Simulation parameters
 with open("default_params.yaml", "r") as f:
