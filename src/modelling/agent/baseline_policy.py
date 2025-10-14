@@ -79,7 +79,7 @@ class TDPolicy:
         """
         Update the Q-value table using the TD learning rule.
         """
-        # If the current state or next state is not in the Q-table, initialize it with zeros
+        # If the current state or next state is not in the Q-table, initialise it with zeros
         if state not in self.q_table:
             self.q_table[state] = np.zeros(self.num_actions)
 

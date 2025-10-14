@@ -4,7 +4,7 @@ import pandas as pd
 from tqdm import tqdm
 from yaml import safe_load
 from src.modelling.environment import IGTEnv
-from src.utils import compute_deck_preferences
+from utils.deck import compute_deck_preferences
 from src.modelling.modulation import DopamineModulation
 from src.modelling.agent import (
     SoftmaxPolicy,
