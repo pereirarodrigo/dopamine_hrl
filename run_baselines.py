@@ -4,9 +4,8 @@ import pandas as pd
 from tqdm import tqdm
 from yaml import safe_load
 from src.modelling.environment import IGTEnv
-from utils.deck import compute_deck_preferences
+from src.utils.deck import compute_deck_preferences
 from src.modelling.agent import TDPolicy, RandomPolicy
-from src.modelling.modulation import DopamineModulation
 
 
 # Simulation parameters

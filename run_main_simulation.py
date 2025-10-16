@@ -4,7 +4,7 @@ import pandas as pd
 from tqdm import tqdm
 from yaml import safe_load
 from src.modelling.environment import IGTEnv
-from utils.deck import compute_deck_preferences
+from src.utils.deck import compute_deck_preferences
 from src.modelling.modulation import DopamineModulation
 from src.modelling.agent import (
     SoftmaxPolicy,
@@ -41,13 +41,13 @@ def run_episode(
         state = tuple(obs.round(2))
 
         # Dopamine-modulated parameters
-        dop_level = getattr(dopamine_mod, "current_dopamine", 1.0)
+        dop_level = getattr(dopamine_mod, "dopamine_level", 1.0)
 
         # Adjust learning rate and temperature based on dopamine level
         # Low dopamine, for example, could lead to lower learning rates and more rigid choices
         # The opposite occurs for high dopamine levels, leading to more exploratory behaviour
-        effective_alpha = max(0.01, base_alpha * dop_level)
-        effective_temp = max(0.05, base_temperature * (1.5 - dop_level))
+        effective_alpha = max(0.001, base_alpha * dop_level)
+        effective_temp = max(0.005, base_temperature * (1.5 - dop_level))
 
         high_policy.alpha = effective_alpha
         low_policy.temperature = effective_temp
@@ -96,6 +96,9 @@ def run_episode(
             "trial": t + 1,
             "deck": action,
             "reward": reward,
+            "learning_rate": effective_alpha,
+            "temperature": effective_temp,
+            "expl_rate": high_policy.epsilon,
             "rpe": rpe,
             "dopamine": dop_level,
             "cumulative_reward": total_reward,
@@ -132,7 +135,7 @@ def run_condition(seed, dysfunction: str = None, agent_id: int = 1, n_episodes: 
     punishment_sensitivity = params["dopamine_modulation"].get("sensitivity", 0.5)
 
     # Initialise an agent and dopamine modulator
-    dopamine_mod = DopamineModulation(has_dysfunction = dysfunction)
+    dopamine_mod = DopamineModulation(learning_rate = base_alpha, has_dysfunction = dysfunction)
     high_policy = DopamineTDPolicy(
         rng, 
         num_states = 1, 
