@@ -108,8 +108,8 @@ def run_condition(
     for ep in range(n_episodes):
         ep_data = run_episode(env, policy, max_steps = n_trials_per_ep)
         df = pd.DataFrame(ep_data)
-        df["episode"] = ep + 1
 
+        df.insert(1, "episode", ep + 1)
         all_episodes.append(df)
 
     df = pd.concat(all_episodes, ignore_index = True)

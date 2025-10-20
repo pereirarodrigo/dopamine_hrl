@@ -84,8 +84,8 @@ def run_episode(
         if t > 0:
             prev_reward = episode_log[-1]["reward"]
             prev_action = episode_log[-1]["deck"]
-            win_stay = int(prev_reward > 0 and action == prev_action)
-            lose_shift = int(prev_reward <= 0 and action != prev_action)
+            win_stay = bool(prev_reward > 0 and action == prev_action)
+            lose_shift = bool(prev_reward <= 0 and action != prev_action)
 
         else:
             win_stay = np.nan
@@ -164,8 +164,8 @@ def run_condition(seed, dysfunction: str = None, agent_id: int = 1, n_episodes: 
             punishment_sensitivity = punishment_sensitivity
         )
         df = pd.DataFrame(ep_data)
-        df["episode"] = ep + 1
 
+        df.insert(0, "episode", ep + 1)
         all_episodes.append(df)
 
     df = pd.concat(all_episodes, ignore_index = True)

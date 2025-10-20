@@ -11,7 +11,7 @@ healthy:
   policy_params:
     learning_rate: 0.1      # moderate learning speed
     gamma: 0.95             # future rewards matter a lot
-    epsilon: 0.9            # biased towards exploration, but still some exploitation
+    epsilon: 0.8            # biased towards exploration, but still some exploitation
     temperature: 1.0        # standard randomness in action selection
   dopamine_modulation:
     scaling: 1.0            # normal RPE signal
