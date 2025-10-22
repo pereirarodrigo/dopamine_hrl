@@ -4,8 +4,6 @@ experiment_params:
   trials_per_episode: 40
   agents_per_condition: 50
   hrl_exp_save_path: logs/hrl
-  rnd_exp_save_path: logs/baseline/random
-  flat_td_exp_save_path: logs/baseline/flat_td
 
 healthy:
   policy_params:

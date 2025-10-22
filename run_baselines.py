@@ -9,7 +9,7 @@ from src.modelling.agent import TDPolicy, RandomPolicy
 
 
 # Simulation parameters
-with open("default_params.yaml", "r") as f:
+with open("default_baseline_params.yaml", "r") as f:
     config = safe_load(f)
 
 

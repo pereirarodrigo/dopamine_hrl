@@ -1,0 +1,25 @@
+experiment_params:
+  num_seeds: 20
+  num_episodes: 20
+  trials_per_episode: 40
+  agents_per_condition: 50
+  rnd_exp_save_path: logs/baseline/random
+  flat_td_exp_save_path: logs/baseline/flat_td
+
+healthy:
+  policy_params:
+    learning_rate: 0.12     # moderate learning speed
+    gamma: 0.9              # future rewards matter a lot
+    epsilon: 0.5            # balanced exploration vs. exploitation
+
+overactive:
+  policy_params:
+    learning_rate: 0.25     # faster learning
+    gamma: 0.3              # much more inclined to value immediate rewards
+    epsilon: 0.05           # much greedier exploitation (less exploration)
+
+depleted:
+  policy_params:
+    learning_rate: 0.03     # slower learning
+    gamma: 0.99             # completely future-oriented
+    epsilon: 0.95           # almost completely random (exploration), no exploitation

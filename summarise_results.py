@@ -17,14 +17,18 @@ from src.utils.plotting import (
 )
 
 # Simulation parameters
-with open("default_params.yaml", "r") as f:
-    config = safe_load(f)
+# Model parameters
+with open("default_model_params.yaml", "r") as f:
+    model_config = safe_load(f)
 
-HRL_DATA_PATH = config["experiment_params"].get("hrl_exp_save_path", "logs/hrl")
-RND_BASELINE_DATA_PATH = config["experiment_params"].get("rnd_exp_save_path", "logs/baseline/random")
-FLAT_TD_DATA_PATH = config["experiment_params"].get("flat_td_exp_save_path", "logs/baseline/flat_td")
+# Baseline parameters
+with open("default_baseline_params.yaml", "r") as f:
+    baseline_config = safe_load(f)
+
+HRL_DATA_PATH = model_config["experiment_params"].get("hrl_exp_save_path", "logs/hrl")
+RND_BASELINE_DATA_PATH = baseline_config["experiment_params"].get("rnd_exp_save_path", "logs/baseline/random")
+FLAT_TD_DATA_PATH = baseline_config["experiment_params"].get("flat_td_exp_save_path", "logs/baseline/flat_td")
 OUTPUT_PATH = "analysis"
-
 
 conditions = ["healthy", "depleted", "overactive"]
 

@@ -14,7 +14,7 @@ from src.modelling.agent import (
 
 
 # Simulation parameters
-with open("default_params.yaml", "r") as f:
+with open("default_model_params.yaml", "r") as f:
     config = safe_load(f)
 
 
