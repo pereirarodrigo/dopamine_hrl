@@ -42,7 +42,7 @@ def plot_advantage_trend(dataframe: pd.DataFrame, output_path: str, filename: st
 
     plt.title("Advantageous Deck Preference over Time", fontsize = 12)
     plt.xlabel("Block")
-    plt.ylabel("Positive = more advantageous")
+    plt.ylabel("Positive = More Advantageous")
     plt.legend(title = "Condition")
     plt.grid(alpha = 0.3)
     plt.tight_layout()
