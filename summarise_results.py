@@ -1,7 +1,8 @@
 import os
 import numpy as np
 import pandas as pd
-from yaml import safe_load
+from src.config import CONDITIONS, SUMMARY_OUTPUT_PATH
+from src.utils.dataset.generated import load_condition_data
 from src.utils.deck import (
     compute_blockwise_winlose,
     compute_block_reward_per_ep,
@@ -15,45 +16,6 @@ from src.utils.plotting import (
     plot_blockwise_winlose_trend,
     plot_advantage_trend_with_agents
 )
-
-# Simulation parameters
-# Model parameters
-with open("default_model_params.yaml", "r") as f:
-    model_config = safe_load(f)
-
-# Baseline parameters
-with open("default_baseline_params.yaml", "r") as f:
-    baseline_config = safe_load(f)
-
-HRL_DATA_PATH = model_config["experiment_params"].get("hrl_exp_save_path", "logs/hrl")
-RND_BASELINE_DATA_PATH = baseline_config["experiment_params"].get("rnd_exp_save_path", "logs/baseline/random")
-FLAT_TD_DATA_PATH = baseline_config["experiment_params"].get("flat_td_exp_save_path", "logs/baseline/flat_td")
-OUTPUT_PATH = "analysis"
-
-conditions = ["healthy", "depleted", "overactive"]
-
-
-def load_condition_data(cond: str, is_baseline: bool = False, is_random: bool = False) -> tuple[pd.DataFrame, str]:
-    """
-    Load data for a specific condition.
-    """
-    if not is_baseline and is_random:
-        raise ValueError("To load the random baseline results, `is_baseline` must be set to True.")
-
-    if not is_baseline:
-        path = f"{HRL_DATA_PATH}/igt_dopamine_hrl_results_{cond}.csv"
-        exp_type = "hrl"
-
-    else:
-        if is_random:
-            path = f"{RND_BASELINE_DATA_PATH}/igt_random_results_{cond}.csv"
-            exp_type = "baseline/random"
-
-        else:
-            path = f"{FLAT_TD_DATA_PATH}/igt_flat_td_results_{cond}.csv"
-            exp_type = "baseline/flat_td"
-
-    return pd.read_csv(path), exp_type
 
 
 def compute_summary(dataframe: pd.DataFrame, n_blocks: int = 4) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -138,7 +100,7 @@ def plot_all_results(
     blockwise_all, block_reward_all, reward_gain_all = [], [], []
 
     # Calculate all important metrics beforehand
-    for cond in conditions:
+    for cond in CONDITIONS:
         data, _ = load_condition_data(cond, is_baseline, is_random)
         blockwise = compute_blockwise_winlose(data)
 
@@ -239,7 +201,7 @@ def run_analysis(is_baseline: bool = False, is_random: bool = False) -> None:
     deck_all, winlose_all, perf_all = [], [], []
     exp_type = ''
 
-    for cond in conditions:
+    for cond in CONDITIONS:
         data, exp_type = load_condition_data(cond, is_baseline, is_random)
         deck_pref, winlose, final_perf = compute_summary(data)
         
@@ -252,7 +214,7 @@ def run_analysis(is_baseline: bool = False, is_random: bool = False) -> None:
     perf_all = pd.concat(perf_all, ignore_index = True)
 
     # Append experiment type to output path, and create directory if it doesn't exist
-    output_path = os.path.join(OUTPUT_PATH, exp_type)
+    output_path = os.path.join(SUMMARY_OUTPUT_PATH, exp_type)
 
     os.makedirs(output_path, exist_ok = True)
 

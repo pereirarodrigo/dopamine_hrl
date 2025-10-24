@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from yaml import safe_load
+from src.config import MODEL_CONFIG
 from src.modelling.environment import IGTEnv
 from src.utils.deck import compute_deck_preferences
 from src.modelling.modulation import DopamineModulation
@@ -11,11 +12,6 @@ from src.modelling.agent import (
     DopamineTDPolicy, 
     SigmoidTermination
 )
-
-
-# Simulation parameters
-with open("default_model_params.yaml", "r") as f:
-    config = safe_load(f)
 
 
 def run_episode(
@@ -121,8 +117,8 @@ def run_condition(seed, dysfunction: str = None, agent_id: int = 1, n_episodes: 
     rng = np.random.default_rng(seed)
     env = IGTEnv(max_steps = n_episodes * n_trials_per_ep)
 
-    # Load parameters from config
-    params = config["healthy"] if dysfunction is None else config[dysfunction]
+    # Load parameters from model config
+    params = MODEL_CONFIG["healthy"] if dysfunction is None else MODEL_CONFIG[dysfunction]
 
     # Initialise base policy parameters
     base_alpha = params["policy_params"].get("learning_rate", 0.1)
@@ -183,11 +179,11 @@ def main() -> None:
     Execute experiments across multiple seeds and conditions, then save results for analysis.
     """
     conditions = [None, "overactive", "depleted"]
-    seeds = list(range(config["experiment_params"].get("num_seeds", 10)))
-    agents_per_condition = config["experiment_params"].get("agents_per_condition", 50)
-    num_episodes = config["experiment_params"].get("num_episodes", 10)
-    trials_per_episode = config["experiment_params"].get("trials_per_episode", 20)
-    save_path = config["experiment_params"].get("hrl_exp_save_path", "logs/hrl")
+    seeds = list(range(MODEL_CONFIG["experiment_params"].get("num_seeds", 10)))
+    agents_per_condition = MODEL_CONFIG["experiment_params"].get("agents_per_condition", 50)
+    num_episodes = MODEL_CONFIG["experiment_params"].get("num_episodes", 10)
+    trials_per_episode = MODEL_CONFIG["experiment_params"].get("trials_per_episode", 20)
+    save_path = MODEL_CONFIG["experiment_params"].get("hrl_exp_save_path", "logs/hrl")
     master_log = []
 
     # Create save directory if it doesn't exist

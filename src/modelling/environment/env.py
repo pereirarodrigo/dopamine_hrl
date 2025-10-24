@@ -40,16 +40,17 @@ class IGTEnv(gym.Env):
 
         # Deck payoff structures (classic Bechara version)
         self.decks = {
-            0: {"gain": 100, "loss_prob": 0.1, "loss_amount": -1250},  # deck A
-            1: {"gain": 100, "loss_prob": 0.1, "loss_amount": -1250},  # deck B
-            2: {"gain": 50,  "loss_prob": 0.1, "loss_amount": -250},   # deck C
-            3: {"gain": 50,  "loss_prob": 0.1, "loss_amount": -250},   # deck D
+            0: [100, 100, 100, 100, 100, -1250, 100, 100, 100, -1250],  # A
+            1: [100, 100, 100, -1250, 100, 100, -1250, 100, 100, 100],  # B
+            2: [50, 50, -250, 50, 50, 50, 50, -250, 50, 50],            # C
+            3: [50, 50, 50, -250, 50, 50, 50, 50, 50, -250],            # D
         }
 
         self.max_steps = max_steps
         self.current_step = 0
         self.cumulative_reward = 0
         self.deck_counts = np.zeros(4, dtype = np.int32)
+        self.deck_indices = np.zeros(4, dtype = np.int32)
 
         self.render_mode = render_mode
 
@@ -62,25 +63,24 @@ class IGTEnv(gym.Env):
 
         self.current_step = 0
         self.cumulative_reward = 0
-        self.deck_counts = np.zeros(4, dtype = np.int32)
-        obs = self._get_obs()
-        info = {}
+        self.deck_counts[:] = 0
+        self.deck_indices[:] = 0
 
-        return obs, info
+        return self._get_obs(), {}
     
 
     def step(self, action: int) -> tuple[np.ndarray, float, bool, bool, dict]:
         """
         Perform one step in the environment given an action.
         """
-        assert self.action_space.contains(action), "Invalid action"
+        assert self.action_space.contains(action), f"Invalid action {action}"
 
-        deck = self.decks[action]
-        reward = deck["gain"]
+        # Deterministic cycle reward
+        idx = self.deck_indices[action]
+        reward = self.decks[action][idx]
 
-        # Pick a random chance for loss
-        if self.np_random.random() < deck["loss_prob"]:
-            reward += deck["loss_amount"]
+        # Increment deck index (loop back after 10)
+        self.deck_indices[action] = (idx + 1) % len(self.decks[action])
 
         self.cumulative_reward += reward
         self.deck_counts[action] += 1
@@ -89,9 +89,8 @@ class IGTEnv(gym.Env):
         obs = self._get_obs()
         terminated = self.current_step >= self.max_steps
         truncated = False
-        info = {}
 
-        return obs, reward, terminated, truncated, info
+        return obs, float(reward), terminated, truncated, {}
 
 
     def _get_obs(self) -> np.ndarray:

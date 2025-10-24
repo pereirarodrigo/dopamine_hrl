@@ -2,15 +2,10 @@ import os
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from yaml import safe_load
+from src.config import BASELINE_CONFIG
 from src.modelling.environment import IGTEnv
 from src.utils.deck import compute_deck_preferences
 from src.modelling.agent import TDPolicy, RandomPolicy
-
-
-# Simulation parameters
-with open("default_baseline_params.yaml", "r") as f:
-    config = safe_load(f)
 
 
 def run_episode(env: IGTEnv, policy: TDPolicy | RandomPolicy, max_steps: int = 200) -> list[dict]:
@@ -80,7 +75,7 @@ def run_condition(
     env = IGTEnv(max_steps = n_episodes * n_trials_per_ep)
 
     # Load parameters from config
-    params = config["healthy"] if dysfunction is None else config[dysfunction]
+    params = BASELINE_CONFIG["healthy"] if dysfunction is None else BASELINE_CONFIG[dysfunction]
 
     # Initialise base policy parameters for the TD agent only
     if agent_type == "td":
@@ -130,16 +125,16 @@ def main(baseline_agent_type: str = "random") -> None:
     assert baseline_agent_type in ["random", "flat_td"], "Invalid baseline agent type. Choose 'random' or 'flat_td'."
 
     conditions = [None, "overactive", "depleted"]
-    seeds = list(range(config["experiment_params"].get("num_seeds", 10)))
-    agents_per_condition = config["experiment_params"].get("agents_per_condition", 50)
-    num_episodes = config["experiment_params"].get("num_episodes", 10)
-    trials_per_episode = config["experiment_params"].get("trials_per_episode", 20)
+    seeds = list(range(BASELINE_CONFIG["experiment_params"].get("num_seeds", 10)))
+    agents_per_condition = BASELINE_CONFIG["experiment_params"].get("agents_per_condition", 50)
+    num_episodes = BASELINE_CONFIG["experiment_params"].get("num_episodes", 10)
+    trials_per_episode = BASELINE_CONFIG["experiment_params"].get("trials_per_episode", 20)
 
     if baseline_agent_type == "random":
-        save_path = config["experiment_params"].get("rnd_exp_save_path", "logs/baseline/random")
+        save_path = BASELINE_CONFIG["experiment_params"].get("rnd_exp_save_path", "logs/baseline/random")
 
     else:
-        save_path = config["experiment_params"].get("flat_td_exp_save_path", "logs/baseline/flat_td")
+        save_path = BASELINE_CONFIG["experiment_params"].get("flat_td_exp_save_path", "logs/baseline/flat_td")
 
     master_log = []
 
