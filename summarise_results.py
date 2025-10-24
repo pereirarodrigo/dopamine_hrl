@@ -18,7 +18,7 @@ from src.utils.plotting import (
 )
 
 
-def compute_summary(dataframe: pd.DataFrame, n_blocks: int = 4) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def compute_summary(dataframe: pd.DataFrame, n_blocks: int = 5) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Compute blockwise deck preferences, win-stay/lose-shift, and final performance across conditions, agents,
     and episodes.

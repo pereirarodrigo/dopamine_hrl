@@ -1,36 +1,42 @@
 experiment_params:
   num_seeds: 20
   num_episodes: 20
-  trials_per_episode: 40
+  trials_per_episode: 60         # extended horizon for stable pattern emergence
   agents_per_condition: 50
   hrl_exp_save_path: logs/hrl
 
 healthy:
   policy_params:
-    learning_rate: 0.2      # moderate learning speed
-    gamma: 0.95             # future rewards matter a lot
-    epsilon: 0.7            # biased towards exploration, but still some exploitation
-    temperature: 1.0        # standard randomness in action selection
+    learning_rate: 0.08          # balanced learning rate
+    gamma: 0.85                  # moderate long-term weighting
+    epsilon: 0.6                 # initial exploration bias
+    epsilon_decay: 0.98          # gradual shift toward exploitation
+    epsilon_min: 0.1             # minimum exploration threshold
+    temperature: 0.9             # slightly reduced randomness
   dopamine_modulation:
-    scaling: 3.0            # normal RPE signal
-    sensitivity: 1.5        # punishments are still bad, but not overwhelming
+    scaling: 1.0                 # normal RPE signal
+    sensitivity: 1.0             # balanced reward/punishment weighting
 
 overactive:
   policy_params:
-    learning_rate: 0.3      # faster learning
-    gamma: 0.1              # much more inclined to value immediate rewards
-    epsilon: 0.15           # much greedier exploitation (less exploration)
-    temperature: 0.6        # much less randomness in action selection
+    learning_rate: 0.15          # faster learning
+    gamma: 0.4                   # more short-term focused
+    epsilon: 0.3                 # limited exploration, stronger exploitation
+    epsilon_decay: 0.97          # smooth decay over episodes
+    epsilon_min: 0.05            # minimal randomness
+    temperature: 0.7             # lower stochasticity, impulsive bias
   dopamine_modulation:
-    scaling: 5.0            # exaggerated RPE signal
-    sensitivity: 0.8        # punishments down-weighted
+    scaling: 1.5                 # enhanced RPE amplitude
+    sensitivity: 0.7             # punishments slightly down-weighted
 
 depleted:
   policy_params:
-    learning_rate: 0.1      # slower learning
-    gamma: 1.0              # completely future-oriented
-    epsilon: 1.0            # completely random (exploration), no exploitation
-    temperature: 2.0        # much more randomness in action selection
+    learning_rate: 0.04          # slower learning rate
+    gamma: 0.95                  # more future-oriented
+    epsilon: 0.9                 # high exploration, weak exploitation
+    epsilon_decay: 0.99          # very gradual decay
+    epsilon_min: 0.2             # maintains mild randomness
+    temperature: 1.3             # higher stochasticity
   dopamine_modulation:
-    scaling: 2.0            # weaker RPE signal
-    sensitivity: 2.5        # punishments hit much harder
+    scaling: 0.7                 # weaker RPE signal
+    sensitivity: 1.5             # punishments hit harder

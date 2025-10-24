@@ -8,11 +8,19 @@ from src.utils.deck import compute_deck_preferences
 from src.modelling.agent import TDPolicy, RandomPolicy
 
 
-def run_episode(env: IGTEnv, policy: TDPolicy | RandomPolicy, max_steps: int = 200) -> list[dict]:
+def run_episode(env: IGTEnv, policy: TDPolicy | RandomPolicy, max_steps: int = 200, reset_env: bool = False) -> list[dict]:
     """
     Run a single IGT episode and collect detailed trial-level data.
     """
-    obs, _ = env.reset()
+    # Reset environment at the beginning of each episode
+    if reset_env:
+        obs, _ = env.reset()
+        env.cumulative_reward = 0.0
+        env.current_step = 0
+
+    else:
+        obs = env._get_obs()
+
     total_reward = 0.0
     episode_log = []
 
@@ -22,8 +30,12 @@ def run_episode(env: IGTEnv, policy: TDPolicy | RandomPolicy, max_steps: int = 2
         # Policy sampling
         action = policy.sample(state)
 
-        # Environment step
+        # Environment step (no reset)
         next_obs, reward, done, _, _ = env.step(action)
+
+        # Clip reward to avoid extreme outliers
+        reward = np.clip(reward, -500, 200)
+
         total_reward += reward
 
         # Update the policy only if it's not a random policy
@@ -44,7 +56,7 @@ def run_episode(env: IGTEnv, policy: TDPolicy | RandomPolicy, max_steps: int = 2
 
         # Log results
         episode_log.append({
-            "trial": t + 1,
+            "trial": env.current_step,  # cumulative trial number
             "deck": action,
             "reward": reward,
             "cumulative_reward": total_reward,
@@ -101,7 +113,7 @@ def run_condition(
     all_episodes = []
 
     for ep in range(n_episodes):
-        ep_data = run_episode(env, policy, max_steps = n_trials_per_ep)
+        ep_data = run_episode(env, policy, max_steps = n_trials_per_ep, reset_env = True)
         df = pd.DataFrame(ep_data)
 
         df.insert(1, "episode", ep + 1)
@@ -154,7 +166,7 @@ def main(baseline_agent_type: str = "random") -> None:
                     dysfunction = cond, 
                     agent_id = agent, 
                     n_episodes = num_episodes, 
-                    n_trials_per_ep = trials_per_episode
+                    n_trials_per_ep = trials_per_episode,
                 )
 
                 master_log.append(df)

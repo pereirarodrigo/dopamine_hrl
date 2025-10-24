@@ -24,59 +24,74 @@ def run_episode(
     base_alpha: float = 0.1,
     base_temperature: float = 1.0,
     reward_scaling: float = 0.5,
-    punishment_sensitivity: float = 0.5
+    punishment_sensitivity: float = 0.5,
+    epsilon_decay: float = 0.99,
+    epsilon_min: float = 0.05,
+    epsilon_max: float = 1.0,
+    reset_env: bool = False
 ) -> list[dict]:
     """
     Run a single IGT episode and collect detailed trial-level data.
     """
-    obs, _ = env.reset()
+    # Reset environment at the beginning of each episode
+    if reset_env:
+        obs, _ = env.reset()
+        env.cumulative_reward = 0.0
+        env.current_step = 0
+
+    else:
+        obs = env._get_obs()
+
     total_reward = 0.0
+    episode_log = []
+    
+    # Persistent total reward across episodes
+    total_reward = env.cumulative_reward
     episode_log = []
 
     for t in range(max_steps):
         state = tuple(obs.round(2))
+        dop_level = getattr(dopamine_mod, "dopamine_level", 0.5)
 
-        # Dopamine-modulated parameters
-        dop_level = getattr(dopamine_mod, "dopamine_level", 1.0)
+        # Adapt learning rate softly with dopamine to never vanish
+        effective_alpha = base_alpha * (0.5 + 0.5 * dop_level)
+        effective_alpha = np.clip(effective_alpha, 0.001, 0.3)
 
-        # Adjust learning rate and temperature based on dopamine level
-        # Low dopamine, for example, could lead to lower learning rates and more rigid choices
-        # The opposite occurs for high dopamine levels, leading to more exploratory behaviour
-        effective_alpha = max(0.001, base_alpha * dop_level)
-        effective_temp = max(0.005, base_temperature * (1.5 - dop_level))
+        # Decrease temperature slightly with dopamine (stability from confidence)
+        effective_temp = base_temperature * (1.2 - 0.4 * dop_level)
+        effective_temp = np.clip(effective_temp, 0.05, 2.5)
 
         high_policy.alpha = effective_alpha
         low_policy.temperature = effective_temp
 
-        # Policy sampling
+        # Epsilon-greedy decay with boundaries ---
+        high_policy.epsilon = max(epsilon_min, min(high_policy.epsilon * epsilon_decay, epsilon_max))
+
+        # Select and execute actions
         option = high_policy.sample(state)
         terminate = term_func.sample(state)
         action = low_policy.sample(state)
 
-        # Environment step
+        # Step in the environment (no reset between episodes)
         next_obs, reward, done, _, _ = env.step(action)
+
+        # Clip reward to avoid extreme outliers
+        reward = np.clip(reward, -400, 200)
+
+        # Update total reward
         total_reward += reward
 
-        # Dopamine and RPE calculations
+        # Dopamine and RPE
         expected = np.mean(high_policy.q_table[state])
-        rpe = dopamine_mod.prediction_error(expected, reward, scaling = reward_scaling)
-        dop_level = dopamine_mod.update_dopamine(reward, rpe, sensitivity = punishment_sensitivity)
+        rpe = dopamine_mod.prediction_error(expected, reward, scaling=reward_scaling)
+        dop_level = dopamine_mod.update_dopamine(reward, rpe, sensitivity=punishment_sensitivity)
 
         # Policy updates
-        high_policy.update(
-            state, 
-            option, 
-            reward, 
-            tuple(next_obs.round(2)), 
-            punishment_sensitivity, 
-            reward_scaling, 
-            done
-        )
+        high_policy.update(state, option, reward, tuple(next_obs.round(2)), punishment_sensitivity, reward_scaling, done)
         low_policy.update(state, action, reward)
         term_func.update(state, advantage = reward)
 
-        # Log results
-        # Compute win-stay/lose-shift if not first trial
+        # Compute win-stay/lose-shift (if not first trial)
         if t > 0:
             prev_reward = episode_log[-1]["reward"]
             prev_action = episode_log[-1]["deck"]
@@ -87,9 +102,9 @@ def run_episode(
             win_stay = np.nan
             lose_shift = np.nan
 
-        # Log results
+        # Log trial
         episode_log.append({
-            "trial": t + 1,
+            "trial": env.current_step,  # cumulative trial number
             "deck": action,
             "reward": reward,
             "learning_rate": effective_alpha,
@@ -107,6 +122,10 @@ def run_episode(
         if done:
             break
 
+    # Tonic dopamine drift between episodes
+    dopamine_mod.dopamine_level += 0.3 * (dopamine_mod.baseline_dopamine - dopamine_mod.dopamine_level)
+    dopamine_mod.dopamine_level = np.clip(dopamine_mod.dopamine_level, 0.05, 0.95)
+
     return episode_log
 
 
@@ -115,7 +134,7 @@ def run_condition(seed, dysfunction: str = None, agent_id: int = 1, n_episodes: 
     Run a full condition (healthy, depleted, overactive) with reproducible seeding.
     """
     rng = np.random.default_rng(seed)
-    env = IGTEnv(max_steps = n_episodes * n_trials_per_ep)
+    env = IGTEnv(max_steps = n_trials_per_ep)
 
     # Load parameters from model config
     params = MODEL_CONFIG["healthy"] if dysfunction is None else MODEL_CONFIG[dysfunction]
@@ -124,6 +143,9 @@ def run_condition(seed, dysfunction: str = None, agent_id: int = 1, n_episodes: 
     base_alpha = params["policy_params"].get("learning_rate", 0.1)
     gamma = params["policy_params"].get("gamma", 0.9)
     base_epsilon = params["policy_params"].get("epsilon", 0.1)
+    epsilon_decay = params["policy_params"].get("epsilon_decay", 0.99)
+    epsilon_min = params["policy_params"].get("epsilon_min", 0.05)
+    epsilon_max = params["policy_params"].get("epsilon_max", 1.0)
     base_temperature = params["policy_params"].get("temperature", 1.0)
 
     # Initialise dopamine parameters
@@ -157,7 +179,11 @@ def run_condition(seed, dysfunction: str = None, agent_id: int = 1, n_episodes: 
             base_alpha = base_alpha,
             base_temperature = base_temperature,
             reward_scaling = reward_scaling,
-            punishment_sensitivity = punishment_sensitivity
+            punishment_sensitivity = punishment_sensitivity,
+            epsilon_decay = epsilon_decay,
+            epsilon_min = epsilon_min,
+            epsilon_max = epsilon_max,
+            reset_env = True
         )
         df = pd.DataFrame(ep_data)
 

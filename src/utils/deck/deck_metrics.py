@@ -71,23 +71,36 @@ def compute_blockwise_reward_gain(dataframe: pd.DataFrame, n_blocks: int = 4) ->
     bins = [i * block_size for i in range(n_blocks + 1)]
     bins[-1] = np.ceil(max_trials)
 
-    # Assign blocks
-    dataframe = dataframe.copy()
+    # Assign block number per trial
     dataframe["block"] = dataframe.groupby(["condition", "agent", "episode"])["trial"].transform(
-        lambda x: pd.cut(x, bins = bins, labels=range(1, n_blocks + 1), include_lowest = True).astype(int)
+        lambda x: pd.cut(x, bins = bins, labels = range(1, n_blocks + 1), include_lowest = True).astype(int)
     )
 
-    # Compute cumulative reward per block
+    # 1️Sum reward per condition x agent x episode x block
     block_reward = (
-        dataframe.groupby(["condition", "agent", "block"])["reward"]
+        dataframe.groupby(["condition", "agent", "episode", "block"])["reward"]
         .sum()
-        .reset_index(name = "block_reward")
+        .reset_index(name="block_reward")
     )
 
-    # Compute reward gain (reward delta) between blocks
-    block_reward["delta_reward"] = block_reward.groupby(["condition", "agent"])["block_reward"].diff().fillna(0)
+    # Average over episodes = mean reward per agent x block
+    agent_mean = (
+        block_reward.groupby(["condition", "agent", "block"])["block_reward"]
+        .mean()
+        .reset_index()
+    )
 
-    return block_reward
+    # Compute per-agent reward delta between consecutive blocks
+    agent_mean["delta_reward"] = agent_mean.groupby(["condition", "agent"])["block_reward"].diff().fillna(0)
+
+    # Compute final mean reward delta across agents for plotting
+    summary = (
+        agent_mean.groupby(["condition", "block"])[["block_reward", "delta_reward"]]
+        .mean()
+        .reset_index()
+    )
+
+    return summary
 
 
 def compute_block_reward_per_ep(data: pd.DataFrame, n_blocks: int = 4) -> pd.DataFrame:

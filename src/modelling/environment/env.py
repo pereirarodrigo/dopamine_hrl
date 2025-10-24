@@ -46,9 +46,14 @@ class IGTEnv(gym.Env):
             3: [50, 50, 50, -250, 50, 50, 50, 50, 50, -250],            # D
         }
 
+        # Environment steps
         self.max_steps = max_steps
         self.current_step = 0
-        self.cumulative_reward = 0
+
+        # Set an initial balance for cumulative reward
+        self.cumulative_reward = 2000
+
+        # Tracking deck selections
         self.deck_counts = np.zeros(4, dtype = np.int32)
         self.deck_indices = np.zeros(4, dtype = np.int32)
 
@@ -62,7 +67,7 @@ class IGTEnv(gym.Env):
         super().reset(seed = seed)
 
         self.current_step = 0
-        self.cumulative_reward = 0
+        self.cumulative_reward = 2000.0
         self.deck_counts[:] = 0
         self.deck_indices[:] = 0
 
