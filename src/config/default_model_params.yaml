@@ -7,42 +7,42 @@ experiment_params:
 
 healthy:
   policy_params:
-    learning_rate: 0.1           # balanced learning rate
-    gamma: 0.9                   # moderate long-term weighting
-    epsilon: 0.7                 # initial exploration bias
-    epsilon_decay: 0.995         # gradual shift toward exploitation
+    learning_rate: 0.12          # balanced learning rate
+    gamma: 0.92                  # moderate long-term weighting
+    epsilon: 0.65                # initial exploration bias
+    epsilon_decay: 0.994         # gradual shift toward exploitation
     epsilon_min: 0.05            # minimum exploration threshold
     epsilon_max: 1.0             # maximum exploration threshold
-    temperature: 0.8             # standard stochasticity, with some bias for high-value actions
+    temperature: 0.9             # standard stochasticity, with some bias for high-value actions
   dopamine_modulation:
-    tonic_drift: 0.02            # slight tonic dopamine adjustment
-    scaling: 0.7                 # Slightly amplified RPE signal (healthy individuals want rewards)
-    sensitivity: 1.0             # balanced reward/punishment weighting
+    tonic_drift: 0.03            # slight tonic dopamine adjustment
+    scaling: 0.8                 # Slightly amplified RPE signal (healthy individuals want rewards)
+    sensitivity: 0.9             # balanced reward/punishment weighting
 
 overactive:
   policy_params:
-    learning_rate: 0.15          # very aggressive learning
-    gamma: 0.4                   # nearly no regard for future reward
-    epsilon: 0.3                 # almost purely exploitative
-    epsilon_decay: 0.99          # very slow decay
-    epsilon_min: 0.05            # minimal exploration
-    epsilon_max: 0.8             # lower overall exploration, but can still explore
-    temperature: 0.8             # standard stochasticity, with some bias for high-value actions
+    learning_rate: 0.45          # very aggressive learning
+    gamma: 0.1                   # nearly no regard for future reward
+    epsilon: 0.25                # almost purely exploitative
+    epsilon_decay: 0.999         # much slower decay
+    epsilon_min: 0.005           # minimal exploration
+    epsilon_max: 0.6             # lower overall exploration, still possible to explore
+    temperature: 0.6             # increased determinism, with slight bias for high-value actions
   dopamine_modulation:
-    tonic_drift: 0.05            # mild tonic dopamine adjustment
-    scaling: 1.5                 # enhanced RPE amplitude
-    sensitivity: 0.6             # punishments down-weighted
+    tonic_drift: 0.02            # mild tonic dopamine adjustment
+    scaling: 1.8                 # enhanced RPE amplitude
+    sensitivity: 0.4             # punishments down-weighted
 
 depleted:
   policy_params:
-    learning_rate: 0.015         # much slower learning rate
-    gamma: 0.3                   # strong future bias, leading to indecision
-    epsilon: 0.95                # very high exploration, weak exploitation
-    epsilon_decay: 0.997         # very slow decay, can't settle
-    epsilon_min: 0.8             # remains indecisive
+    learning_rate: 0.08          # much slower learning rate
+    gamma: 0.95                  # strong future bias, leading to indecision
+    epsilon: 0.9                 # very high exploration, weak exploitation
+    epsilon_decay: 0.998         # very slow decay, can't settle
+    epsilon_min: 0.75            # remains indecisive
     epsilon_max: 1.0             # full exploration potential
-    temperature: 2.2             # high stochasticity
+    temperature: 2.0             # high stochasticity
   dopamine_modulation:
-    tonic_drift: 0.15            # stronger tonic dopamine adjustment
-    scaling: 0.35                # severely dampened RPE signal
-    sensitivity: 3.0             # punishments hit much harder, leading to catastrophic demotivation
+    tonic_drift: 0.12            # stronger tonic dopamine adjustment
+    scaling: 0.3                 # severely dampened RPE signal
+    sensitivity: 3.2             # punishments hit much harder, leading to catastrophic demotivation
