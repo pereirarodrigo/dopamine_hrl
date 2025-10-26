@@ -1,7 +1,7 @@
 experiment_params:
   num_seeds: 20
   num_episodes: 20
-  trials_per_episode: 40
+  trials_per_episode: 100
   agents_per_condition: 50
   rnd_exp_save_path: logs/baseline/random
   flat_td_exp_save_path: logs/baseline/flat_td
@@ -10,16 +10,25 @@ healthy:
   policy_params:
     learning_rate: 0.12     # moderate learning speed
     gamma: 0.9              # future rewards matter a lot
-    epsilon: 0.5            # balanced exploration vs. exploitation
+    epsilon: 0.6            # balanced exploration vs. exploitation
+    epsilon_decay: 0.98     # gradual decay of exploration
+    epsilon_min: 0.1        # ensures some exploration
+    epsilon_max: 1.0        # maximum exploration threshold
 
 overactive:
   policy_params:
     learning_rate: 0.25     # faster learning
     gamma: 0.3              # much more inclined to value immediate rewards
     epsilon: 0.05           # much greedier exploitation (less exploration)
+    epsilon_decay: 0.97     # smooth decay over episodes
+    epsilon_min: 0.05       # minimal randomness
+    epsilon_max: 0.8        # lower overall exploration
 
 depleted:
   policy_params:
     learning_rate: 0.03     # slower learning
     gamma: 0.99             # completely future-oriented
     epsilon: 0.95           # almost completely random (exploration), no exploitation
+    epsilon_decay: 0.99     # very gradual decay
+    epsilon_min: 0.2        # maintains mild randomness
+    epsilon_max: 1.0        # full exploration potential

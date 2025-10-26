@@ -2,10 +2,8 @@ import os
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from yaml import safe_load
 from src.config import MODEL_CONFIG
 from src.modelling.environment import IGTEnv
-from src.utils.deck import compute_deck_preferences
 from src.modelling.modulation import DopamineModulation
 from src.modelling.agent import (
     SoftmaxPolicy,
@@ -23,11 +21,12 @@ def run_episode(
     max_steps: int = 200,
     base_alpha: float = 0.1,
     base_temperature: float = 1.0,
-    reward_scaling: float = 0.5,
-    punishment_sensitivity: float = 0.5,
     epsilon_decay: float = 0.99,
     epsilon_min: float = 0.05,
     epsilon_max: float = 1.0,
+    tonic_drift: float = 0.05,
+    reward_scaling: float = 0.5,
+    punishment_sensitivity: float = 0.5,
     reset_env: bool = False
 ) -> list[dict]:
     """
@@ -42,11 +41,9 @@ def run_episode(
     else:
         obs = env._get_obs()
 
-    total_reward = 0.0
-    episode_log = []
-    
     # Persistent total reward across episodes
-    total_reward = env.cumulative_reward
+    total_reward = 0.0
+    total_true_reward = 0.0
     episode_log = []
 
     for t in range(max_steps):
@@ -64,7 +61,7 @@ def run_episode(
         high_policy.alpha = effective_alpha
         low_policy.temperature = effective_temp
 
-        # Epsilon-greedy decay with boundaries ---
+        # Epsilon-greedy decay with boundaries
         high_policy.epsilon = max(epsilon_min, min(high_policy.epsilon * epsilon_decay, epsilon_max))
 
         # Select and execute actions
@@ -73,27 +70,34 @@ def run_episode(
         action = low_policy.sample(state)
 
         # Step in the environment (no reset between episodes)
-        next_obs, reward, done, _, _ = env.step(action)
+        next_obs, reward, done, _, info = env.step(action)
 
-        # Clip reward to avoid extreme outliers
-        reward = np.clip(reward, -400, 200)
+        # Clip extreme rewards for stability
+        true_reward = np.clip(reward, -200, 200)
 
-        # Update total reward
-        total_reward += reward
-
-        # Dopamine and RPE
+        # Dopamine-modulated reward
         expected = np.mean(high_policy.q_table[state])
-        rpe = dopamine_mod.prediction_error(expected, reward, scaling=reward_scaling)
-        dop_level = dopamine_mod.update_dopamine(reward, rpe, sensitivity=punishment_sensitivity)
+        rpe = dopamine_mod.prediction_error(expected, true_reward, scaling = reward_scaling)
+        dop_level, perceived_reward = dopamine_mod.update_dopamine(true_reward, rpe, sensitivity = punishment_sensitivity)
 
-        # Policy updates
-        high_policy.update(state, option, reward, tuple(next_obs.round(2)), punishment_sensitivity, reward_scaling, done)
-        low_policy.update(state, action, reward)
-        term_func.update(state, advantage = reward)
+        # Log cumulative rewards
+        total_reward += perceived_reward
+        total_true_reward += true_reward
+
+        # Policy learning
+        high_policy.update(
+            state, 
+            option, 
+            perceived_reward, 
+            tuple(next_obs.round(2)),
+            done
+        )
+        low_policy.update(state, action, perceived_reward)
+        term_func.update(state, advantage = perceived_reward)
 
         # Compute win-stay/lose-shift (if not first trial)
         if t > 0:
-            prev_reward = episode_log[-1]["reward"]
+            prev_reward = episode_log[-1]["perceived_reward"]
             prev_action = episode_log[-1]["deck"]
             win_stay = bool(prev_reward > 0 and action == prev_action)
             lose_shift = bool(prev_reward <= 0 and action != prev_action)
@@ -104,15 +108,16 @@ def run_episode(
 
         # Log trial
         episode_log.append({
-            "trial": env.current_step,  # cumulative trial number
+            "trial": t + 1, 
             "deck": action,
-            "reward": reward,
-            "learning_rate": effective_alpha,
+            "true_reward": true_reward,
+            "perceived_reward": perceived_reward,
             "temperature": effective_temp,
             "expl_rate": high_policy.epsilon,
             "rpe": rpe,
             "dopamine": dop_level,
-            "cumulative_reward": total_reward,
+            "cumulative_true_reward": total_true_reward,
+            "cumulative_perceived_reward": total_reward,
             "win_stay": win_stay,
             "lose_shift": lose_shift
         })
@@ -122,19 +127,21 @@ def run_episode(
         if done:
             break
 
-    # Tonic dopamine drift between episodes
-    dopamine_mod.dopamine_level += 0.3 * (dopamine_mod.baseline_dopamine - dopamine_mod.dopamine_level)
+    # Bounded asymmetric tonic dopamine drift between episodes
+    # Performance improvement increases dopamine, poor performance decreases it
+    mean_r = np.mean([r["perceived_reward"] for r in episode_log])
+    dopamine_mod.dopamine_level += tonic_drift * np.tanh(-0.3 * mean_r)
     dopamine_mod.dopamine_level = np.clip(dopamine_mod.dopamine_level, 0.05, 0.95)
 
     return episode_log
 
 
-def run_condition(seed, dysfunction: str = None, agent_id: int = 1, n_episodes: int = 20, n_trials_per_ep: int = 10) -> pd.DataFrame:
+def run_condition(seed: int, dysfunction: str = None, agent_id: int = 1, n_episodes: int = 20, n_trials_per_ep: int = 10) -> pd.DataFrame:
     """
     Run a full condition (healthy, depleted, overactive) with reproducible seeding.
     """
     rng = np.random.default_rng(seed)
-    env = IGTEnv(max_steps = n_trials_per_ep)
+    env = IGTEnv(max_steps = n_trials_per_ep, seed = seed)
 
     # Load parameters from model config
     params = MODEL_CONFIG["healthy"] if dysfunction is None else MODEL_CONFIG[dysfunction]
@@ -149,6 +156,7 @@ def run_condition(seed, dysfunction: str = None, agent_id: int = 1, n_episodes: 
     base_temperature = params["policy_params"].get("temperature", 1.0)
 
     # Initialise dopamine parameters
+    tonic_drift = params["dopamine_modulation"].get("tonic_drift", 0.05)
     reward_scaling = params["dopamine_modulation"].get("scaling", 0.5)
     punishment_sensitivity = params["dopamine_modulation"].get("sensitivity", 0.5)
 
@@ -160,14 +168,15 @@ def run_condition(seed, dysfunction: str = None, agent_id: int = 1, n_episodes: 
         num_options = 4, 
         alpha = base_alpha, 
         gamma = gamma, 
-        epsilon = base_epsilon,
-        dopamine_modulation = dopamine_mod)
+        epsilon = base_epsilon
+    )
     low_policy = SoftmaxPolicy(rng, lr = base_alpha, num_states = 1, num_actions = 4, temperature = base_temperature)
     term_func = SigmoidTermination(rng, lr = 0.05, num_states = 1)
 
     # List to hold all episode data
     all_episodes = []
 
+    # Run episodes
     for ep in range(n_episodes):
         ep_data = run_episode(
             env, 
@@ -178,11 +187,12 @@ def run_condition(seed, dysfunction: str = None, agent_id: int = 1, n_episodes: 
             max_steps = n_trials_per_ep,
             base_alpha = base_alpha,
             base_temperature = base_temperature,
-            reward_scaling = reward_scaling,
-            punishment_sensitivity = punishment_sensitivity,
             epsilon_decay = epsilon_decay,
             epsilon_min = epsilon_min,
             epsilon_max = epsilon_max,
+            tonic_drift = tonic_drift,
+            reward_scaling = reward_scaling,
+            punishment_sensitivity = punishment_sensitivity,
             reset_env = True
         )
         df = pd.DataFrame(ep_data)
@@ -190,6 +200,7 @@ def run_condition(seed, dysfunction: str = None, agent_id: int = 1, n_episodes: 
         df.insert(0, "episode", ep + 1)
         all_episodes.append(df)
 
+    # Concatenate all episode data
     df = pd.concat(all_episodes, ignore_index = True)
 
     df.insert(0, "agent", agent_id + 1)
@@ -213,7 +224,9 @@ def main() -> None:
     master_log = []
 
     # Create save directory if it doesn't exist
-    os.makedirs(save_path, exist_ok = True)
+    output_path = os.path.join(save_path, f"choice_{trials_per_episode}")
+
+    os.makedirs(output_path, exist_ok = True)
 
     for cond in conditions:
         condition_name = cond if cond is not None else "healthy"
@@ -236,12 +249,7 @@ def main() -> None:
         condition_name = cond if cond is not None else "healthy"
         results = pd.concat(master_log, ignore_index = True)
 
-        results.to_csv(f"{save_path}/igt_dopamine_hrl_results_{condition_name}.csv", index = False)
-
-        # Save deck preferences summary
-        prefs = compute_deck_preferences(results)
-
-        prefs.to_csv(f"{save_path}/igt_dopamine_hrl_deck_prefs_{condition_name}.csv", index = False)
+        results.to_csv(f"{output_path}/igt_dopamine_hrl_results_{condition_name}.csv", index = False)
         
         print(f"Completed: {condition_name} ({len(seeds)} seeds x {agents_per_condition} agents x {num_episodes * trials_per_episode} trials)")
         

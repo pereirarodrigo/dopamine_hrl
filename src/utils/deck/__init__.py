@@ -1,6 +1,7 @@
 from .deck_metrics import (
-    compute_deck_preferences, 
+    assign_blocks,
     compute_blockwise_winlose,
-    compute_block_reward_per_ep,
-    compute_blockwise_reward_gain
+    compute_blockwise_net_score,
+    compute_total_cumulative_reward,
+    compute_blockwise_cumulative_reward
 )

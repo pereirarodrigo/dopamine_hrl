@@ -1,107 +1,51 @@
-import os
-import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from src.utils.deck import compute_blockwise_reward_gain
 
 
-def plot_advantage_trend(dataframe: pd.DataFrame, output_path: str, filename: str) -> None:
+# Global aesthetic settings
+sns.set_theme(style = "whitegrid", context = "talk")
+plt.rcParams.update({
+    "axes.spines.top": False,
+    "axes.spines.right": False,
+    "axes.titlepad": 12,
+    "axes.labelpad": 8,
+    "legend.frameon": True
+})
+
+# Define a consistent color palette for conditions
+palette = {
+    "healthy": "#3B82F6",      # blue
+    "overactive": "#10B981",   # green
+    "depleted": "#F97316"      # orange
+}
+
+
+def plot_net_score_trend(df_net: pd.DataFrame, output_path: str) -> None:
     """
-    Plot smooth learning trends (advantage index over blocks) with mean +/- standard error of the mean (SEM) 
-    per condition.
+    Plot the trend of net scores across blocks.
     """
-    plt.figure(figsize = (7, 5))
-    
-    # Compute mean +/- SEM per condition x block
-    summary = (
-        dataframe.groupby(["condition", "block"])["advantage_index"]
-        .agg(["mean", "sem"])
-        .reset_index()
+    plt.figure(figsize = (8,6))
+    sns.lineplot(
+        data = df_net, x = "block", y = "net_score", hue = "condition",
+        palette = palette, marker = "o", err_style = "band", errorbar = "se"
     )
-    
-    # Plot each condition as a smooth line with shaded SEM
-    palette = {
-        "healthy": "#4C72B0",
-        "depleted": "#DD8452",
-        "overactive": "#55A868"
-    }
-    
-    for cond, group in summary.groupby("condition"):
-        plt.plot(group["block"], group["mean"], label = cond, color = palette.get(cond, None), lw = 2)
-        plt.fill_between(
-            group["block"],
-            group["mean"] - group["sem"],
-            group["mean"] + group["sem"],
-            alpha = 0.2,
-            color = palette.get(cond, None)
-        )
-
-    # Create path if it doesn't exist
-    os.makedirs(output_path, exist_ok = True)
-
-    plt.title("Advantageous Deck Preference over Time", fontsize = 12)
+    plt.title("Mean Net Score Across Blocks")
     plt.xlabel("Block")
     plt.ylabel("Positive = More Advantageous")
     plt.legend(title = "Condition")
-    plt.grid(alpha = 0.3)
     plt.tight_layout()
-    plt.savefig(f"{output_path}/{filename}.png", dpi = 300)
+    plt.savefig(f"{output_path}/net_score_trend.png", dpi = 300)
     plt.close()
 
 
-def plot_advantage_trend_with_agents(dataframe: pd.DataFrame, output_path: str, filename: str) -> None:
+def plot_winlose_trend(df_winlose: pd.DataFrame, output_path: str) -> None:
     """
-    Plot smooth learning trends (advantage index over blocks) with mean +/- standard error of the mean (SEM) 
-    per condition and agent.
+    Plot the trend of win-stay and lose-shift rates across blocks.
     """
-    plt.figure(figsize = (7, 5))
-    palette = {"healthy": "#4C72B0", "depleted": "#DD8452", "overactive": "#55A868"}
+    plt.figure(figsize = (8, 6))
 
-    # Plot individual agent trends (faint lines)
-    for cond, group in dataframe.groupby("condition"):
-        for agent, agent_data in group.groupby("agent"):
-            plt.plot(agent_data["block"], agent_data["advantage_index"], color=palette[cond], alpha=0.1, linewidth=0.7)
-
-    # Overlay condition means +/- SEM
-    summary = (
-        dataframe.groupby(["condition", "block"])["advantage_index"]
-        .agg(["mean", "sem"])
-        .reset_index()
-    )
-
-    for cond, group in summary.groupby("condition"):
-        plt.plot(group["block"], group["mean"], label = cond, color = palette[cond], lw = 2.5)
-        plt.fill_between(
-            group["block"], 
-            group["mean"] - group["sem"], 
-            group["mean"] + group["sem"],
-            color = palette[cond], 
-            alpha = 0.25
-        )
-
-    # Create path if it doesn't exist
-    os.makedirs(output_path, exist_ok = True)
-
-    plt.title("Advantageous Deck Preference over Time (By Agent)", fontsize = 12)
-    plt.xlabel("Block")
-    plt.ylabel("Positive = more advantageous")
-    plt.legend(title = "Condition")
-    plt.grid(alpha = 0.3)
-    plt.tight_layout()
-    plt.savefig(f"{output_path}/{filename}.png", dpi = 300)
-    plt.close()
-
-
-
-def plot_blockwise_winlose_trend(dataframe: pd.DataFrame, output_path: str, filename: str) -> None:
-    """
-    Plot win-stay and lose-shift behaviour over time (by block) for each dopamine condition.
-    """
-    plt.figure(figsize = (7, 5))
-    palette = {"healthy": "#4C72B0", "depleted": "#DD8452", "overactive": "#55A868"}
-
-    melted = dataframe.melt(
+    melted = df_winlose.melt(
         id_vars = ["condition", "agent", "block"],
         value_vars = ["win_stay", "lose_shift"],
         var_name = "Metric",
@@ -121,114 +65,50 @@ def plot_blockwise_winlose_trend(dataframe: pd.DataFrame, output_path: str, file
         errorbar = "se"
     )
 
-    # Create path if it doesn't exist
-    os.makedirs(output_path, exist_ok = True)
-
-    plt.title("Behavioural Adaptation over Time (Win-Stay/Lose-Shift)", fontsize = 12)
+    plt.title("Win-Stay/Lose-Shift Across Blocks")
     plt.xlabel("Block")
     plt.ylabel("Mean Probability")
-    plt.legend(title = "Condition/Metric")
-    plt.grid(alpha = 0.3)
+    plt.legend(title = "Condition")
     plt.tight_layout()
-    plt.savefig(f"{output_path}/{filename}.png", dpi = 300)
+    plt.savefig(f"{output_path}/winlose_trend.png", dpi = 300)
     plt.close()
 
 
-def plot_blockwise_reward_trend(dataframe: pd.DataFrame, output_path: str, filename: str) -> None:
+def plot_cumulative_reward(df_cum: pd.DataFrame, output_path: str) -> None:
     """
-    Plot mean cumulative reward per block across conditions to show learning progression.
-    Includes ±SEM shading for variability visualization.
+    Plot the trend of cumulative rewards across blocks.
     """
-    plt.figure(figsize = (7, 5))
-    palette = {"healthy": "#4C72B0", "depleted": "#DD8452", "overactive": "#55A868"}
-
-    # Compute mean and SEM across agents per condition × block
-    summary = (
-        dataframe.groupby(["condition", "block"])["cumulative_reward"]
-        .agg(["mean", "sem"])
-        .reset_index()
+    reward_col = (
+        "cumulative_perceived_reward" if "cumulative_perceived_reward" in df_cum.columns 
+        else "cumulative_reward"
     )
 
-    for cond, group in summary.groupby("condition"):
-        plt.plot(group["block"], group["mean"], label = cond, color = palette.get(cond), lw = 2.5)
-        plt.fill_between(
-            group["block"],
-            group["mean"] - group["sem"],
-            group["mean"] + group["sem"],
-            alpha = 0.25,
-            color = palette.get(cond)
-        )
-
-    # Create path if it doesn't exist
-    os.makedirs(output_path, exist_ok = True)
-
-    plt.title("Blockwise Cumulative Reward Trend", fontsize = 12)
+    plt.figure(figsize = (8,6))
+    sns.lineplot(
+        data = df_cum, x = "block", y = reward_col, hue = "condition",
+        palette = palette, marker = "o", err_style = "band", errorbar = "se"
+    )
+    plt.title("Cumulative Reward Across Blocks")
     plt.xlabel("Block")
     plt.ylabel("Mean Cumulative Reward")
     plt.legend(title = "Condition")
-    plt.grid(alpha = 0.3)
     plt.tight_layout()
-    plt.savefig(f"{output_path}/{filename}.png", dpi = 300)
+    plt.savefig(f"{output_path}/cumulative_reward_trend.png", dpi = 300)
     plt.close()
 
 
-def plot_reward_gain_trend(dataframe: pd.DataFrame, output_path: str, filename: str) -> None:
+def plot_final_total_reward(df_total: pd.DataFrame, output_path: str) -> None:
     """
-    Plot blockwise reward gain (reward delta) over time per condition.
+    Plot the final total reward by condition.
     """
-    plt.figure(figsize = (7, 5))
-    palette = {"healthy": "#4C72B0", "depleted": "#DD8452", "overactive": "#55A868"}
-
-    summary = (
-        dataframe.groupby(["condition", "block"])["delta_reward"]
-        .agg(["mean", "sem"])
-        .reset_index()
+    plt.figure(figsize = (7,6))
+    sns.barplot(
+        data = df_total, x = "condition", y = "total_reward",
+        palette = palette, hue = "condition", legend = False, errorbar = "se"
     )
-
-    for cond, group in summary.groupby("condition"):
-        plt.plot(group["block"], group["mean"], label = cond, color = palette[cond], lw = 2)
-        plt.fill_between(
-            group["block"],
-            group["mean"] - group["sem"],
-            group["mean"] + group["sem"],
-            color = palette[cond],
-            alpha = 0.25
-        )
-
-    # Create path if it doesn't exist
-    os.makedirs(output_path, exist_ok = True)
-
-    plt.title("Blockwise Learning Gain (Δ Reward)", fontsize=12)
-    plt.xlabel("Block")
-    plt.ylabel("Δ Mean Reward from Previous Block")
-    plt.legend(title = "Condition")
-    plt.grid(alpha = 0.3)
+    plt.title("Total Cumulative Reward by Condition")
+    plt.xlabel("")
+    plt.ylabel("Total Reward")
     plt.tight_layout()
-    plt.savefig(f"{output_path}/{filename}.png", dpi = 300)
+    plt.savefig(f"{output_path}/final_total_reward.png", dpi = 300)
     plt.close()
-
-
-def plot_metric(
-    dataframe: pd.DataFrame, 
-    x: pd.Series, 
-    y: pd.Series,
-    hue: str, 
-    title: str, 
-    ylabel: str, 
-    filename: str,
-    output_path: str
-) -> None:
-    """
-    Plot a given metric with error bars.
-    """
-    # Create path if it doesn't exist
-    os.makedirs(output_path, exist_ok = True)
-
-    plt.figure(figsize = (7, 5))
-    sns.barplot(data = dataframe, x = x, y = y, hue = hue, errorbar = "sd", alpha = 0.8)
-    plt.title(title, fontsize = 12)
-    plt.ylabel(ylabel)
-    plt.tight_layout()
-    plt.savefig(f"{output_path}/{filename}.png", dpi = 300)
-    plt.close()
-

@@ -2,127 +2,107 @@ import numpy as np
 import pandas as pd
 
 
-def compute_deck_preferences(dataframe: pd.DataFrame) -> pd.DataFrame:
+def assign_blocks(df: pd.DataFrame, n_blocks: int = 5) -> pd.DataFrame:
     """
-    Compute deck preferences and advantage index for each agent in the dataframe.
+    Assigns block indices (1..n_blocks) per episode based on trial number.
     """
-    prefs = (
-        dataframe.groupby(["agent", "condition"])["deck"]
+    max_trials = df["trial"].max()
+    block_edges = np.linspace(0, max_trials, n_blocks + 1)
+    df = df.copy()
+    df["block"] = df.groupby(["condition", "agent", "episode"])["trial"].transform(
+        lambda x: pd.cut(x, bins = block_edges, labels = range(1, n_blocks + 1), include_lowest = True).astype(int)
+    )
+
+    return df
+
+
+def compute_blockwise_net_score(df: pd.DataFrame, n_blocks: int = 5) -> pd.DataFrame:
+    """
+    Net score (advantageous - disadvantageous choices) per block: (C + D) - (A + B)
+    """
+    df = assign_blocks(df, n_blocks)
+    block_choices = (
+        df.groupby(["condition", "agent", "episode", "block"])["deck"]
         .value_counts(normalize = True)
         .unstack(fill_value = 0)
         .rename(columns = {0: "A", 1: "B", 2: "C", 3: "D"})
         .reset_index()
     )
-    prefs["advantage_index"] = (prefs["C"] + prefs["D"]) - (prefs["A"] + prefs["B"])
-
-    return prefs
-
-
-def compute_blockwise_winlose(dataframe: pd.DataFrame, n_blocks: int = 4) -> pd.DataFrame:
-    """
-    Compute blockwise win-stay and lose-shift probabilities for each agent and condition.
-    """
-    # Determine bin edges dynamically
-    max_trials = dataframe["trial"].max()
-    block_size = max_trials / n_blocks
-    bins = [i * block_size for i in range(n_blocks + 1)]
-    bins[-1] = np.ceil(max_trials)
-
-    df_sorted = dataframe.sort_values(["condition", "agent", "episode", "trial"]).copy()
-    df_sorted["block"] = df_sorted.groupby(["condition", "agent", "episode"])["trial"].transform(
-        lambda x: pd.cut(x, bins = bins, labels = range(1, n_blocks + 1), include_lowest = True).astype(int)
+    block_choices["net_score"] = (block_choices["C"] + block_choices["D"]) - (
+        block_choices["A"] + block_choices["B"]
     )
 
-    # Previous reward and choice
-    df_sorted["prev_reward"] = df_sorted.groupby(["condition", "agent", "episode"])["reward"].shift(1)
-    df_sorted["prev_deck"] = df_sorted.groupby(["condition", "agent", "episode"])["deck"].shift(1)
-
-    # Outcome classification
-    df_sorted["reward_outcome"] = df_sorted["prev_reward"].apply(lambda r: "win" if pd.notnull(r) and r > 0 else "lose")
-
-    df_sorted["win_stay"] = (
-        (df_sorted["reward_outcome"] == "win") &
-        (df_sorted["deck"] == df_sorted["prev_deck"])
-    ).astype(int)
-
-    df_sorted["lose_shift"] = (
-        (df_sorted["reward_outcome"] == "lose") &
-        (df_sorted["deck"] != df_sorted["prev_deck"])
-    ).astype(int)
-
-    # Aggregate per block
-    blockwise = (
-        df_sorted.groupby(["condition", "agent", "block"])[["win_stay", "lose_shift"]]
+    # Mean per agent across episodes
+    return (
+        block_choices.groupby(["condition", "agent", "block"])["net_score"]
         .mean()
         .reset_index()
     )
 
-    return blockwise
 
-
-def compute_blockwise_reward_gain(dataframe: pd.DataFrame, n_blocks: int = 4) -> pd.DataFrame:
+def compute_blockwise_winlose(df: pd.DataFrame, n_blocks: int = 5) -> pd.DataFrame:
     """
-    Compute mean cumulative reward per block and derive block-to-block reward gains (delta of reward) to visualise 
-    learning improvement across conditions.
+    Win-stay/lose-shift per block.
     """
-    # Determine bin edges dynamically
-    max_trials = dataframe["trial"].max()
-    block_size = max_trials / n_blocks
-    bins = [i * block_size for i in range(n_blocks + 1)]
-    bins[-1] = np.ceil(max_trials)
+    # Choose perceived reward if available
+    reward_col = "perceived_reward" if "perceived_reward" in df.columns else "reward"
 
-    # Assign block number per trial
-    dataframe["block"] = dataframe.groupby(["condition", "agent", "episode"])["trial"].transform(
-        lambda x: pd.cut(x, bins = bins, labels = range(1, n_blocks + 1), include_lowest = True).astype(int)
+    df = assign_blocks(df, n_blocks).sort_values(
+        ["condition", "agent", "episode", "trial"]
+    )
+    df["prev_reward"] = df.groupby(["condition", "agent", "episode"])[reward_col].shift(1)
+    df["prev_deck"] = df.groupby(["condition", "agent", "episode"])["deck"].shift(1)
+    df["outcome"] = np.where(df["prev_reward"] > 0, "win", "lose")
+
+    df["win_stay"] = ((df["outcome"] == "win") & (df["deck"] == df["prev_deck"])).astype(int)
+    df["lose_shift"] = ((df["outcome"] == "lose") & (df["deck"] != df["prev_deck"])).astype(int)
+
+    return (
+        df.groupby(["condition", "agent", "block"])[["win_stay", "lose_shift"]]
+        .mean()
+        .reset_index()
     )
 
-    # 1️Sum reward per condition x agent x episode x block
-    block_reward = (
-        dataframe.groupby(["condition", "agent", "episode", "block"])["reward"]
+
+def compute_blockwise_cumulative_reward(df: pd.DataFrame, n_blocks: int = 5) -> pd.DataFrame:
+    """
+    Mean cumulative reward per block.
+    """
+    df = assign_blocks(df, n_blocks)
+
+    # Choose perceived reward if available
+    reward_col = (
+        "cumulative_perceived_reward" if "cumulative_perceived_reward" in df.columns 
+        else "cumulative_reward"
+    )
+
+    # Last cumulative reward of each block per episode
+    block_end = (
+        df.groupby(["condition", "agent", "episode", "block"], as_index = False)
+        .apply(lambda g: g.loc[g["trial"].idxmax()])
+        .reset_index(drop = True)
+    )
+
+    # Average across episodes → agent-level mean
+    return (
+        block_end.groupby(["condition", "agent", "block"])[reward_col]
+        .mean()
+        .reset_index()
+    )
+
+
+def compute_total_cumulative_reward(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Total reward per agent across all trials and episodes.
+    """
+    # Choose perceived reward if available
+    reward_col = (
+        "cumulative_perceived_reward" if "cumulative_perceived_reward" in df.columns 
+        else "cumulative_reward"
+    )
+
+    return (
+        df.groupby(["condition", "agent"])[reward_col]
         .sum()
-        .reset_index(name="block_reward")
+        .reset_index(name = "total_reward")
     )
-
-    # Average over episodes = mean reward per agent x block
-    agent_mean = (
-        block_reward.groupby(["condition", "agent", "block"])["block_reward"]
-        .mean()
-        .reset_index()
-    )
-
-    # Compute per-agent reward delta between consecutive blocks
-    agent_mean["delta_reward"] = agent_mean.groupby(["condition", "agent"])["block_reward"].diff().fillna(0)
-
-    # Compute final mean reward delta across agents for plotting
-    summary = (
-        agent_mean.groupby(["condition", "block"])[["block_reward", "delta_reward"]]
-        .mean()
-        .reset_index()
-    )
-
-    return summary
-
-
-def compute_block_reward_per_ep(data: pd.DataFrame, n_blocks: int = 4) -> pd.DataFrame:
-    """
-    Assign blockwise reward per episode for plotting purposes.
-    """
-    # Determine block membership per agent and episode
-    max_trials = data["trial"].max()
-    n_blocks = 4
-    block_size = max_trials / n_blocks
-    bins = [i * block_size for i in range(n_blocks + 1)]
-    bins[-1] = np.ceil(max_trials)
-
-    data["block"] = data.groupby(["condition", "agent", "episode"])["trial"].transform(
-        lambda x: pd.cut(x, bins = bins, labels = range(1, n_blocks + 1), include_lowest = True).astype(int)
-    )
-
-    # Average cumulative reward per block
-    block_reward = (
-        data.groupby(["condition", "agent", "block"])["cumulative_reward"]
-        .mean()
-        .reset_index()
-    )
-
-    return block_reward

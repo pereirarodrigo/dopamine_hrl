@@ -5,11 +5,10 @@ from gymnasium import spaces
 
 class IGTEnv(gym.Env):
     """
-    Iowa Gambling Task (IGT) environment.
+    Iowa Gambling Task (IGT) environment (Bechara et al., 1994 version).
     
     Observation:
         A simple vector with cumulative reward and deck selection counts.
-        (can be expanded with more features if needed)
 
     Actions:
         Type: Discrete(4)
@@ -27,8 +26,11 @@ class IGTEnv(gym.Env):
 
     metadata = {"render_modes": ["human"]}
 
-    def __init__(self, max_steps: int = 100, render_mode: bool = None) -> None:
+    def __init__(self, max_steps: int = 100, render_mode: bool = None, seed: int = None) -> None:
         super().__init__()
+
+        # Set the seed
+        self.seed = np.random.default_rng(seed)
 
         # Define action (4 decks)
         self.action_space = spaces.Discrete(4)
@@ -40,11 +42,15 @@ class IGTEnv(gym.Env):
 
         # Deck payoff structures (classic Bechara version)
         self.decks = {
-            0: [100, 100, 100, 100, 100, -1250, 100, 100, 100, -1250],  # A
-            1: [100, 100, 100, -1250, 100, 100, -1250, 100, 100, 100],  # B
-            2: [50, 50, -250, 50, 50, 50, 50, -250, 50, 50],            # C
-            3: [50, 50, 50, -250, 50, 50, 50, 50, 50, -250],            # D
+            0: [100, 100, 100, 100, 100, -1250, 100, 100, 100, -1250],  # A (bad)
+            1: [100, 100, 100, -1250, 100, 100, -1250, 100, 100, 100],  # B (bad)
+            2: [50, 50, -250, 50, 50, 50, 50, -250, 50, 50],            # C (good)
+            3: [50, 50, 50, -250, 50, 50, 50, 50, 50, -250],            # D (good)
         }
+
+        # Shuffle the decks to reflect uncertainty
+        for deck in self.decks.values():
+            self.seed.shuffle(deck)
 
         # Environment steps
         self.max_steps = max_steps

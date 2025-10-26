@@ -4,11 +4,18 @@ import pandas as pd
 from tqdm import tqdm
 from src.config import BASELINE_CONFIG
 from src.modelling.environment import IGTEnv
-from src.utils.deck import compute_deck_preferences
 from src.modelling.agent import TDPolicy, RandomPolicy
 
 
-def run_episode(env: IGTEnv, policy: TDPolicy | RandomPolicy, max_steps: int = 200, reset_env: bool = False) -> list[dict]:
+def run_episode(
+    env: IGTEnv, 
+    policy: TDPolicy | RandomPolicy, 
+    epsilon_decay: float = 0.99,
+    epsilon_min: float = 0.05,
+    epsilon_max: float = 1.0, 
+    max_steps: int = 200,
+    reset_env: bool = False
+) -> list[dict]:
     """
     Run a single IGT episode and collect detailed trial-level data.
     """
@@ -34,12 +41,15 @@ def run_episode(env: IGTEnv, policy: TDPolicy | RandomPolicy, max_steps: int = 2
         next_obs, reward, done, _, _ = env.step(action)
 
         # Clip reward to avoid extreme outliers
-        reward = np.clip(reward, -500, 200)
+        reward = np.clip(reward, -300, 200)
 
         total_reward += reward
 
         # Update the policy only if it's not a random policy
         if isinstance(policy, TDPolicy):
+            # Epsilon-greedy decay with boundaries
+            policy.epsilon = max(epsilon_min, min(policy.epsilon * epsilon_decay, epsilon_max))
+
             policy.update(state, action, reward, tuple(next_obs.round(2)), done)
 
         # Log results
@@ -56,7 +66,7 @@ def run_episode(env: IGTEnv, policy: TDPolicy | RandomPolicy, max_steps: int = 2
 
         # Log results
         episode_log.append({
-            "trial": env.current_step,  # cumulative trial number
+            "trial": env.current_step,
             "deck": action,
             "reward": reward,
             "cumulative_reward": total_reward,
@@ -73,7 +83,7 @@ def run_episode(env: IGTEnv, policy: TDPolicy | RandomPolicy, max_steps: int = 2
 
 
 def run_condition(
-    seed, 
+    seed: int,
     agent_type: str = "random",
     dysfunction: str = None, 
     agent_id: int = 1, 
@@ -84,7 +94,8 @@ def run_condition(
     Run a full condition (healthy, depleted, overactive) with reproducible seeding.
     """
     rng = np.random.default_rng(seed)
-    env = IGTEnv(max_steps = n_episodes * n_trials_per_ep)
+    env = IGTEnv(max_steps = n_trials_per_ep, seed = seed)
+    epsilon_decay, epsilon_min, epsilon_max = 0.99, 0.05, 1.0
 
     # Load parameters from config
     params = BASELINE_CONFIG["healthy"] if dysfunction is None else BASELINE_CONFIG[dysfunction]
@@ -94,6 +105,9 @@ def run_condition(
         lr = params["policy_params"].get("learning_rate", 0.1)
         gamma = params["policy_params"].get("gamma", 0.9)
         epsilon = params["policy_params"].get("epsilon", 0.1)
+        epsilon_decay = params["policy_params"].get("epsilon_decay", 0.99)
+        epsilon_min = params["policy_params"].get("epsilon_min", 0.05)
+        epsilon_max = params["policy_params"].get("epsilon_max", 1.0)
 
         # Initialise the agent
         policy = TDPolicy(
@@ -113,7 +127,15 @@ def run_condition(
     all_episodes = []
 
     for ep in range(n_episodes):
-        ep_data = run_episode(env, policy, max_steps = n_trials_per_ep, reset_env = True)
+        ep_data = run_episode(
+            env, 
+            policy, 
+            epsilon_decay = epsilon_decay if agent_type == "td" else 0.0,
+            epsilon_min = epsilon_min if agent_type == "td" else 0.0,
+            epsilon_max = epsilon_max if agent_type == "td" else 0.0,
+            max_steps = n_trials_per_ep, 
+            reset_env = True
+        )
         df = pd.DataFrame(ep_data)
 
         df.insert(1, "episode", ep + 1)
@@ -151,7 +173,9 @@ def main(baseline_agent_type: str = "random") -> None:
     master_log = []
 
     # Create save directory if it doesn't exist
-    os.makedirs(save_path, exist_ok = True)
+    output_path = os.path.join(save_path, f"choice_{trials_per_episode}")
+
+    os.makedirs(output_path, exist_ok = True)
 
     for cond in conditions:
         condition_name = cond if cond is not None else "healthy"
@@ -175,12 +199,7 @@ def main(baseline_agent_type: str = "random") -> None:
         condition_name = cond if cond is not None else "healthy"
         results = pd.concat(master_log, ignore_index = True)
 
-        results.to_csv(f"{save_path}/igt_{baseline_agent_type}_results_{condition_name}.csv", index = False)
-
-        # Save deck preferences summary
-        prefs = compute_deck_preferences(results)
-
-        prefs.to_csv(f"{save_path}/igt_{baseline_agent_type}_deck_prefs_{condition_name}.csv", index = False)
+        results.to_csv(f"{output_path}/igt_{baseline_agent_type}_results_{condition_name}.csv", index = False)
         
         print(f"Completed: {condition_name} ({len(seeds)} seeds x {agents_per_condition} agents x {num_episodes * trials_per_episode} trials)")
         

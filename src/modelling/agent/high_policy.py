@@ -1,13 +1,11 @@
 import numpy as np
 from scipy.special import expit
 from collections import defaultdict
-from src.modelling.modulation import DopamineModulation
 
 
 class DopamineTDPolicy:
     """
-    Implementation of temporal difference (TD) learning for policy estimation, which will also leverage a dopamine 
-    modulation module.
+    Implementation of temporal difference (TD) learning for policy estimation.
 
     Attributes:
         rng (np.random): Random number generator.
@@ -17,10 +15,9 @@ class DopamineTDPolicy:
         gamma (float): Discount factor for future rewards.
         epsilon (float): Exploration rate for epsilon-greedy action selection.
         q_table (defaultdict): Q-value table for state-option pairs.
-        dopamine_modulation (DopamineModulation): Instance of the DopamineModulation class to simulate dopamine effects.
 
     Methods:
-        update(state, option, reward, next_state, done): Update the Q-value table using the TD learning rule and dopamine modulation.
+        update(state, option, reward, next_state, done): Update the Q-value table using the TD learning rule.
         sample(state): Sample an option based on maximum Q-value with epsilon-greedy exploration.
     """
     def __init__(
@@ -31,7 +28,6 @@ class DopamineTDPolicy:
         alpha: float = 0.1, 
         gamma: float = 0.9, 
         epsilon: float = 0.1,
-        dopamine_modulation: DopamineModulation = None
     ) -> None:
         self.rng = rng
         self.num_states = num_states
@@ -39,7 +35,6 @@ class DopamineTDPolicy:
         self.alpha = alpha
         self.gamma = gamma
         self.epsilon = epsilon
-        self.dopamine_modulation = dopamine_modulation
         self.q_table = defaultdict()
 
 
@@ -49,8 +44,6 @@ class DopamineTDPolicy:
         option: int, 
         reward: float, 
         next_state: tuple, 
-        sensitivity: float,
-        scaling: float,
         done: bool
     ) -> None:
         """
@@ -62,12 +55,6 @@ class DopamineTDPolicy:
 
         if next_state not in self.q_table:
             self.q_table[next_state] = np.zeros(self.num_options)
-
-        # Apply dopamine modulation
-        if self.dopamine_modulation:
-            expected_reward = self.q_table[state][option]
-            rpe = self.dopamine_modulation.prediction_error(expected_reward, reward, scaling)
-            reward = self.dopamine_modulation.update_dopamine(reward, rpe, sensitivity)
 
         # TD update rule
         best_next_action = np.argmax(self.q_table[next_state])

@@ -25,7 +25,7 @@ def eta_squared_from_anova(f_stat: float, k: int, N: int) -> float:
     return (f_stat * (k - 1)) / (f_stat * (k - 1) + (N - k))
 
 
-def verify_behavioural_diff() -> None:
+def verify_behavioural_diff(n_trials: int) -> None:
     """
     Verify behavioural differences across conditions by performing statistical tests on final performance.
     """
@@ -90,7 +90,9 @@ def verify_behavioural_diff() -> None:
     eta_sq = eta_squared_from_anova(anova_stat, k, N)
 
     # Create folder if it doesn't exist
-    os.makedirs(BEHAVIOURAL_OUTPUT_PATH, exist_ok = True)
+    output_path = os.path.join(BEHAVIOURAL_OUTPUT_PATH, f"choice_{n_trials}")
+
+    os.makedirs(output_path, exist_ok = True)
 
     # Create and save DataFrames for t-test and ANOVA results
     t_test_results = pd.DataFrame(t_test_results)
@@ -100,13 +102,13 @@ def verify_behavioural_diff() -> None:
         "eta_squared": eta_sq
     }])
 
-    t_test_results.to_csv(f"{BEHAVIOURAL_OUTPUT_PATH}/conditional_t_test_results.csv", index = False)
-    anova_results.to_csv(f"{BEHAVIOURAL_OUTPUT_PATH}/conditional_anova_results.csv", index = False)
+    t_test_results.to_csv(f"{output_path}/conditional_t_test_results.csv", index = False)
+    anova_results.to_csv(f"{output_path}/conditional_anova_results.csv", index = False)
 
-    print(f"Behavioural statistics complete. Results saved to: {BEHAVIOURAL_OUTPUT_PATH}")
+    print(f"Behavioural statistics complete. Results saved to: {output_path}")
 
 
-def igt_validation() -> None:
+def igt_validation(n_trials: int) -> None:
     """
     Evaluate agent behaviours vs. empirical findings from IGT studies. The comparison is primarily reward and deck choice-
     based.
@@ -163,14 +165,16 @@ def igt_validation() -> None:
     }])
 
     # Create folder if it doesn't exist
-    os.makedirs(BEHAVIOURAL_OUTPUT_PATH, exist_ok = True)
+    output_path = os.path.join(BEHAVIOURAL_OUTPUT_PATH, f"choice_{n_trials}")
+    
+    os.makedirs(output_path, exist_ok = True)
 
     # Save results
-    results_df.to_csv(f"{BEHAVIOURAL_OUTPUT_PATH}/igt_behaviour_validation.csv", index = False)
+    results_df.to_csv(f"{output_path}/igt_behaviour_validation.csv", index = False)
 
-    print(f"IGT validation complete. Results saved to: {BEHAVIOURAL_OUTPUT_PATH}")
+    print(f"IGT validation complete. Results saved to: {output_path}")
 
 
 if __name__ == "__main__":
-    verify_behavioural_diff()
-    igt_validation()
+    verify_behavioural_diff(n_trials = 100)
+    igt_validation(n_trials = 100)
