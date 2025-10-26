@@ -92,14 +92,14 @@ class DopamineModulation:
         # Overactive leads to inflated positives and underweight negatives
         # Depleted leads to deflated positives and overweight negatives
         if self.has_dysfunction == "overactive":
-            perceived_reward = reward * (1 + 0.4 * (self.dopamine_level - 0.5))
+            perceived_reward = reward * (1 + 0.15 * (self.dopamine_level - 0.5))
             
         elif self.has_dysfunction == "depleted":
             perceived_reward = reward * (0.2 - 1.0 * (self.dopamine_level - 0.5))
 
         else:
             # To avoid overpenalising healthy agents, add a small boost to dopamine level (an "optimism term")
-            perceived_reward = reward * (self.dopamine_level + 0.4)
+            perceived_reward = reward * (self.dopamine_level + 0.5)
 
         # Punishment sensitivity amplification
         # Some noise is added to reflect variability in negative perception

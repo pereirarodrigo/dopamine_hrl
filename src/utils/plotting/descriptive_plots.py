@@ -41,10 +41,11 @@ def plot_net_score_trend(df_net: pd.DataFrame, output_path: str) -> None:
 
 def plot_winlose_trend(df_winlose: pd.DataFrame, output_path: str) -> None:
     """
-    Plot the trend of win-stay and lose-shift rates across blocks.
+    Plot separate trends of win-stay and lose-shift rates across blocks for each condition.
     """
-    plt.figure(figsize = (8, 6))
+    fig, axes = plt.subplots(1, 2, figsize = (14, 6), sharey = True)
 
+    # Melt dataframe to long form
     melted = df_winlose.melt(
         id_vars = ["condition", "agent", "block"],
         value_vars = ["win_stay", "lose_shift"],
@@ -52,23 +53,31 @@ def plot_winlose_trend(df_winlose: pd.DataFrame, output_path: str) -> None:
         value_name = "Rate"
     )
 
-    sns.lineplot(
-        data = melted,
-        x = "block",
-        y = "Rate",
-        hue = "condition",
-        style = "Metric",
-        markers = True,
-        dashes = False,
-        lw = 2,
-        palette = palette,
-        errorbar = "se"
-    )
+    # Define metrics for looping
+    metrics = ["win_stay", "lose_shift"]
+    titles = ["Win-Stay Across Blocks", "Lose-Shift Across Blocks"]
 
-    plt.title("Win-Stay/Lose-Shift Across Blocks")
-    plt.xlabel("Block")
-    plt.ylabel("Mean Probability")
-    plt.legend(title = "Condition")
+    for ax, metric, title in zip(axes, metrics, titles):
+        subset = melted[melted["Metric"] == metric]
+
+        sns.lineplot(
+            data = subset,
+            x = "block",
+            y = "Rate",
+            hue = "condition",
+            markers = True,
+            dashes = False,
+            lw = 2,
+            errorbar = "se",
+            palette = palette,
+            ax = ax
+        )
+
+        ax.set_title(title)
+        ax.set_xlabel("Block")
+        ax.set_ylabel("Mean Probability" if metric == "win_stay" else "")
+        ax.legend(title = "Condition")
+
     plt.tight_layout()
     plt.savefig(f"{output_path}/winlose_trend.png", dpi = 300)
     plt.close()
