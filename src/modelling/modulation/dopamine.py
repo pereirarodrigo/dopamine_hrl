@@ -83,23 +83,24 @@ class DopamineModulation:
             delta *= 0.2 if reward > 0 else 1.5
             sensitivity *= 1.5
 
-        # Apply learning and decay
-        # Dopaminergic fatigue at high levels (self-limiting euphoria)
-        self.dopamine_level += self.recovery_rate * (self.baseline_dopamine - self.dopamine_level) * 0.25
+        # Apply learning
+        self.dopamine_level += (
+            self.recovery_rate * (self.baseline_dopamine - self.dopamine_level) + 0.05 * self.learning_rate * delta
+        )
         self.dopamine_level = np.clip(self.dopamine_level, *self.clip_range)
 
         # Dopamine-weighted reward perception
         # Overactive leads to inflated positives and underweight negatives
         # Depleted leads to deflated positives and overweight negatives
         if self.has_dysfunction == "overactive":
-            perceived_reward = reward * (1 + 0.15 * (self.dopamine_level - 0.5))
+            perceived_reward = reward * (1 + 0.5 * (self.dopamine_level - 0.8))
             
         elif self.has_dysfunction == "depleted":
             perceived_reward = reward * (0.2 - 1.0 * (self.dopamine_level - 0.5))
 
         else:
             # To avoid overpenalising healthy agents, add a small boost to dopamine level (an "optimism term")
-            perceived_reward = reward * (self.dopamine_level + 0.5)
+            perceived_reward = reward * (self.dopamine_level + 0.4)
 
         # Punishment sensitivity amplification
         # Some noise is added to reflect variability in negative perception

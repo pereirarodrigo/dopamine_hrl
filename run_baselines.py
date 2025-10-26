@@ -37,11 +37,12 @@ def run_episode(
         # Policy sampling
         action = policy.sample(state)
 
-        # Environment step (no reset)
+        # Environment step
         next_obs, reward, done, _, _ = env.step(action)
 
         # Clip reward to avoid extreme outliers
-        reward = np.clip(reward, -300, 200)
+        reward = np.clip(reward, -250, 150)
+        reward /= 100  # normalise reward scale (flat TD is very sensitive to reward magnitude)
 
         total_reward += reward
 

@@ -17,7 +17,10 @@ from src.utils.plotting import (
 )
 
 
-def compute_summary(data: pd.DataFrame, n_blocks: int = 5):
+def compute_summary(
+    data: pd.DataFrame, 
+    n_blocks: int = 5
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Compute the four main behavioural metrics:
 
