@@ -4,6 +4,8 @@ import pandas as pd
 from scipy.stats import ttest_ind, f_oneway
 from src.utils.dataset.generated import load_condition_data
 from src.utils.dataset.steingroever import build_igt_dataset
+from src.utils.plotting.descriptive_plots import plot_deck_analysis
+from src.utils.deck.deck_metrics import compute_blockwise_deck_analysis
 from src.config import BEHAVIOURAL_OUTPUT_PATH, IGT_HEALTHY_DATASET_PATH
 
 
@@ -37,7 +39,7 @@ def verify_behavioural_diff(n_trials: int) -> None:
     # Compute final performance per agent per episode
     final_performance = (
         pd.concat([healthy_df, depleted_df, overactive_df])
-        .groupby(["condition", "agent", "episode"])["reward"]
+        .groupby(["condition", "agent", "episode"])["perceived_reward"]
         .sum()
         .reset_index()
     )
@@ -55,8 +57,8 @@ def verify_behavioural_diff(n_trials: int) -> None:
 
     # Perform t-tests for each pair
     for cond1, cond2 in condition_pairs:
-        group1 = final_performance[final_performance["condition"] == cond1]["reward"]
-        group2 = final_performance[final_performance["condition"] == cond2]["reward"]
+        group1 = final_performance[final_performance["condition"] == cond1]["perceived_reward"]
+        group2 = final_performance[final_performance["condition"] == cond2]["perceived_reward"]
 
         t_stat, p_value = ttest_ind(group1, group2, equal_var=False)
         d = cohen_d(group1, group2)
@@ -77,9 +79,9 @@ def verify_behavioural_diff(n_trials: int) -> None:
 
     # Perform ANOVA
     groups = [
-        final_performance.loc[final_performance["condition"] == "healthy", "reward"],
-        final_performance.loc[final_performance["condition"] == "depleted", "reward"],
-        final_performance.loc[final_performance["condition"] == "overactive", "reward"],
+        final_performance.loc[final_performance["condition"] == "healthy", "perceived_reward"],
+        final_performance.loc[final_performance["condition"] == "depleted", "perceived_reward"],
+        final_performance.loc[final_performance["condition"] == "overactive", "perceived_reward"],
     ]
 
     anova_stat, anova_p_value = f_oneway(*groups)
@@ -108,71 +110,85 @@ def verify_behavioural_diff(n_trials: int) -> None:
     print(f"Behavioural statistics complete. Results saved to: {output_path}")
 
 
-def igt_validation(n_trials: int) -> None:
+def igt_validation(n_trials: int) -> None: 
     """
-    Evaluate agent behaviours vs. empirical findings from IGT studies. The comparison is primarily reward and deck choice-
-    based.
-    """
-    # Load IGT and agent data
-    igt_df = build_igt_dataset(path = IGT_HEALTHY_DATASET_PATH, n_trials = 100)
-    healthy_df, _ = load_condition_data("healthy", is_baseline = False, is_random = False)
-
-    # Select comparable segment from agent data
-    last_eps = healthy_df["episode"].unique()[-3:]
-    agent_df = healthy_df[healthy_df["episode"].isin(last_eps)].copy()
-    agent_df = agent_df.head(100).reset_index(drop = True)
-
-    # Align lengths
-    min_len = min(len(agent_df), len(igt_df))
-    agent_df = agent_df.head(min_len)
-    igt_df = igt_df.head(min_len)
-
-    # Compute MSE metrics
-    reward_mse = np.mean((np.array(agent_df["reward"], dtype=float) - np.array(igt_df["reward"], dtype=float)) ** 2)
-    deck_mse = np.mean((np.array(agent_df["deck"], dtype=float) - np.array(igt_df["deck"], dtype=float)) ** 2)
-
-    # Independent-samples t-test between simulated and empirical rewards
-    t_reward, p_reward = ttest_ind(agent_df["reward"], igt_df["reward"], equal_var = False)
-    t_deck, p_deck = ttest_ind(agent_df["deck"], igt_df["deck"], equal_var = False)
-
-    # One-way ANOVA
-    anova_reward, anova_p_reward = f_oneway(agent_df["reward"], igt_df["reward"])
-    anova_deck, anova_p_deck = f_oneway(agent_df["deck"], igt_df["deck"])
-
-    d_reward = cohen_d(agent_df["reward"], igt_df["reward"])
-    d_deck = cohen_d(agent_df["deck"], igt_df["deck"])
-
-    # Bonferroni correction for 2 comparisons (reward + deck)
-    p_reward_bonf = min(float(p_reward) * 2, 1.0)
-    p_deck_bonf = min(float(p_deck) * 2, 1.0)
-
-    # Build results dataframe
-    results_df = pd.DataFrame([{
-        "reward_mse": reward_mse,
-        "deck_mse": deck_mse,
-        "t_stat_reward": t_reward,
-        "p_reward": p_reward,
-        "p_reward_bonferroni": p_reward_bonf,
-        "cohen_d_reward": d_reward,
-        "t_stat_deck": t_deck,
-        "p_deck": p_deck,
-        "p_deck_bonferroni": p_deck_bonf,
-        "cohen_d_deck": d_deck,
-        "anova_reward_stat": anova_reward,
-        "anova_reward_p": anova_p_reward,
-        "anova_deck_stat": anova_deck,
-        "anova_deck_p": anova_p_deck
-    }])
-
-    # Create folder if it doesn't exist
-    output_path = os.path.join(BEHAVIOURAL_OUTPUT_PATH, f"choice_{n_trials}")
+    Evaluate agent behaviours vs. empirical findings from IGT studies, using an agent-trial granularity. Each (agent, trial) combination is matched to its IGT counterpart, and metrics are averaged across agents and trials.
+    """ 
+    # Load IGT and simulated data 
+    igt_df = build_igt_dataset(path = IGT_HEALTHY_DATASET_PATH, n_trials = n_trials) 
+    healthy_df, _ = load_condition_data("healthy", is_baseline = False, is_random = False) 
+    
+    # Select the last episode of the healthy condition for comparison
+    last_episode = healthy_df["episode"].max() 
+    agent_df = healthy_df[healthy_df["episode"] == last_episode] 
+    
+    # Match number of agents between datasets 
+    n_agents = min(agent_df["agent"].nunique(), igt_df["agent"].nunique()) 
+    igt_df = igt_df[igt_df["agent"] <= n_agents] 
+    agent_df = agent_df[agent_df["agent"] <= n_agents] 
+    
+    # Merge trial-by-trial across both datasets 
+    merged = pd.merge( 
+        agent_df, 
+        igt_df, 
+        on = ["agent", "trial"], 
+        suffixes = ("_sim", "_igt"), 
+        how = "inner" 
+    ) 
+    
+    if merged.empty: 
+        raise ValueError("Merged dataframe is empty — check alignment of agent/trial indices.") 
+    
+    # Compute trial-level error signals
+    merged["reward_sq_error"] = (merged["true_reward"] - merged["reward"]) ** 2 
+    merged["deck_sq_error"] = (merged["deck_sim"] - merged["deck_igt"]) ** 2 
+    
+    # Average across agents and trials 
+    reward_mse = merged["reward_sq_error"].mean() 
+    deck_mse = merged["deck_sq_error"].mean() 
+    
+    # Compute between-distribution statistics using the full population of paired trials 
+    t_reward, p_reward = ttest_ind(merged["true_reward"], merged["reward"], equal_var = False) 
+    t_deck, p_deck = ttest_ind(merged["deck_sim"], merged["deck_igt"], equal_var = False) 
+    d_reward = cohen_d(merged["true_reward"], merged["reward"]) 
+    d_deck = cohen_d(merged["deck_sim"], merged["deck_igt"]) 
+    
+    # Bonferroni correction 
+    p_reward_bonf = min(float(p_reward) * 2, 1.0) 
+    p_deck_bonf = min(float(p_deck) * 2, 1.0) 
+    
+    # Build summary 
+    results_df = pd.DataFrame([{ 
+        "reward_mse_mean": reward_mse, 
+        "deck_mse_mean": deck_mse, 
+        "t_stat_reward": t_reward, 
+        "p_reward": p_reward, 
+        "p_reward_bonferroni": p_reward_bonf, 
+        "cohen_d_reward": d_reward, 
+        "t_stat_deck": t_deck, 
+        "p_deck": p_deck, 
+        "p_deck_bonferroni": p_deck_bonf, 
+        "cohen_d_deck": d_deck, 
+        "n_agents": n_agents, 
+        "n_trials_total": len(merged) 
+    }]) 
+    
+    # Save main output 
+    output_path = os.path.join(BEHAVIOURAL_OUTPUT_PATH, f"choice_{n_trials}") 
     
     os.makedirs(output_path, exist_ok = True)
-
-    # Save results
-    results_df.to_csv(f"{output_path}/igt_behaviour_validation.csv", index = False)
-
-    print(f"IGT validation complete. Results saved to: {output_path}")
+    results_df.to_csv(f"{output_path}/igt_behaviour_validation.csv", index = False) 
+    
+    print(f"IGT behavioural validation complete. Results saved to: {output_path}") 
+    
+    block_df = compute_blockwise_deck_analysis(agent_df, igt_df) 
+    
+    # Plot and save results 
+    plot_deck_analysis(agent_df, igt_df, output_path, block_size = 20) 
+    
+    block_df.to_csv(f"{output_path}/blockwise_deck_similarity.csv", index = False) 
+    
+    print(f"Block-wise deck analysis saved to: {output_path}")
 
 
 if __name__ == "__main__":

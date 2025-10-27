@@ -1,6 +1,6 @@
 import os
+import re
 import pandas as pd
-from src.utils.deck import compute_deck_preferences
 
 
 def load_igt_data(path: str, n_trials: int = 100) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -9,58 +9,56 @@ def load_igt_data(path: str, n_trials: int = 100) -> tuple[pd.DataFrame, pd.Data
     """
     assert n_trials in [95, 100, 150], "Number of trials must be either 95, 100, or 150."
 
+    # Define file names based on number of trials
     deck_file = f"choice_{n_trials}.csv"
     wins_file = f"wi_{n_trials}.csv"
     losses_file = f"lo_{n_trials}.csv"
-    deck_data = pd.read_csv(os.path.join(path, deck_file))
-    wins_data = pd.read_csv(os.path.join(path, wins_file))
-    losses_data = pd.read_csv(os.path.join(path, losses_file))
+
+    # Load datasets
+    deck_data = pd.read_csv(os.path.join(path, deck_file), index_col = 0)
+    wins_data = pd.read_csv(os.path.join(path, wins_file), index_col = 0)
+    losses_data = pd.read_csv(os.path.join(path, losses_file), index_col = 0)
+
+    # Make the index a proper column
+    deck_data = deck_data.reset_index()
+    wins_data = wins_data.reset_index()
+    losses_data = losses_data.reset_index()
 
     return deck_data, wins_data, losses_data
 
 
-def preprocess_igt_dataset(df: pd.DataFrame, type: str) -> pd.DataFrame:
+def preprocess_igt_dataset(df: pd.DataFrame, res_type: str) -> pd.DataFrame:
     """
-    Preprocess IGT dataset based on the specified type: 'deck', 'wins', or 'losses'.
+    Preprocess IGT dataset based on the specified result type.
     """
-    assert type in ["deck", "wins", "losses"], "Type must be one of 'deck', 'wins', or 'losses'."
+    assert res_type in ["deck", "reward", "loss"], "Type must be one of 'deck', 'reward', or 'losses'."
 
-    df_long = None
+    # Identify subject column (the first column, e.g., 'Subj_1')
+    subj_col = df.columns[0]
 
-    if type == "deck":
-        # Reshape from wide to long format
-        df_long = df.melt(
-            id_vars = df.columns[0],
-            var_name = "trial_col",
-            value_name = "deck"
-        )
+    # Melt into long format
+    df_long = df.melt(
+        id_vars = subj_col,
+        var_name = "trial_col",
+        value_name = res_type
+    )
 
-    elif type == "wins":
-        df_long = df.melt(
-            id_vars = df.columns[0],
-            var_name = "trial_col",
-            value_name = "reward"
-        )
+    # Extract numeric trial number from column name
+    df_long["trial"] = df_long["trial_col"].apply(
+        lambda x: int(re.search(r"(\d+)$", x).group(1))
+    )
 
-    elif type == "losses":
-        df_long = df.melt(
-            id_vars = df.columns[0],
-            var_name = "trial_col",
-            value_name = "loss"
-        )
+    # Extract subject number from the first column
+    df_long["agent"] = df_long[subj_col].astype(str).apply(
+        lambda x: int(re.search(r"(\d+)$", x).group(1))
+    )
 
-    # Extract numeric trial number
-    df_long["trial"] = df_long["trial_col"].str.extract(r'(\d+)').astype(int)
-
-    # Assign metadata columns
-    df_long["agent"] = df_long[df.columns[0]].astype(str).str.extract(r'(\d+)').astype(int)
-
-    # Sort to ensure agent order
-    df_long = df_long.sort_values(["agent", "trial"]).reset_index(drop = True)
-
-    # Re-order columns to match the correct format
-    cols = ["agent", "trial", "loss"]
-    df_long = df_long[cols]
+    df_long = (
+        df_long[["agent", "trial", res_type]]
+        .drop_duplicates(["agent", "trial"])
+        .sort_values(["agent", "trial"])
+        .reset_index(drop = True)
+    )
 
     return df_long
 
@@ -86,7 +84,7 @@ def combine_igt_data(deck_df: pd.DataFrame, wins_df: pd.DataFrame, losses_df: pd
     )
 
     # Calculate net reward (wins - losses)
-    combined_df["reward"] = combined_df["reward"].fillna(0) - combined_df["loss"].fillna(0)
+    combined_df["reward"] = combined_df["reward"].fillna(0) - abs(combined_df["loss"]).fillna(0)
 
     # Drop the separate loss column
     combined_df = combined_df.drop(columns = ["loss"])
@@ -102,13 +100,10 @@ def build_igt_dataset(path: str, n_trials: int = 100) -> pd.DataFrame:
     deck_data, wins_data, losses_data = load_igt_data(path, n_trials)
 
     # Preprocess individual datasets
-    deck_df = preprocess_igt_dataset(deck_data, type = "deck")
-    wins_df = preprocess_igt_dataset(wins_data, type = "wins")
-    losses_df = preprocess_igt_dataset(losses_data, type = "losses")
+    deck_df = preprocess_igt_dataset(deck_data, res_type = "deck")
+    wins_df = preprocess_igt_dataset(wins_data, res_type = "reward")
+    losses_df = preprocess_igt_dataset(losses_data, res_type = "loss")
 
     combined_df = combine_igt_data(deck_df, wins_df, losses_df)
-
-    # Compute deck preferences and advantage index
-    prefs = compute_deck_preferences(combined_df, mode = "human")
 
     return combined_df

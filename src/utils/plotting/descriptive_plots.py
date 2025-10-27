@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -121,3 +122,87 @@ def plot_final_total_reward(df_total: pd.DataFrame, output_path: str) -> None:
     plt.tight_layout()
     plt.savefig(f"{output_path}/final_total_reward.png", dpi = 300)
     plt.close()
+
+
+def plot_deck_analysis(agent_df: pd.DataFrame, igt_df: pd.DataFrame, output_path: str, block_size: int) -> None:
+    """
+    Plot block-wise deck choice proportions and similarity metrics.
+    """
+    # Assign block indices if not present
+    if "block" not in agent_df.columns:
+        agent_df["block"] = ((agent_df["trial"] - 1) // block_size) + 1
+
+    if "block" not in igt_df.columns:
+        igt_df["block"] = ((igt_df["trial"] - 1) // block_size) + 1
+
+    # Aggregate deck-choice proportions per block
+    agent_block = (
+        agent_df.groupby(["block", "deck"])
+        .size().unstack(fill_value = 0)
+        .apply(lambda x: x / x.sum(), axis = 1)
+    )
+    igt_block = (
+        igt_df.groupby(["block", "deck"])
+        .size().unstack(fill_value = 0)
+        .apply(lambda x: x / x.sum(), axis = 1)
+    )
+
+    # Melt to long format
+    agent_long = (
+        agent_block.reset_index()
+        .melt(id_vars = "block", var_name = "deck", value_name = "proportion")
+    )
+    igt_long = (
+        igt_block.reset_index()
+        .melt(id_vars = "block", var_name = "deck", value_name = "proportion")
+    )
+
+    # Distinct colors per deck
+    deck_palette = {
+        "A": "#ef4444",  # red
+        "B": "#f59e0b",  # amber
+        "C": "#10b981",  # green
+        "D": "#3b82f6",  # blue
+    }
+
+    # Iterate over decks (ensure deck labels are strings for safety)
+    for deck in sorted(agent_long["deck"].astype(str).unique()):
+        deck_agent = agent_long[agent_long["deck"].astype(str) == deck]
+        deck_igt = igt_long[igt_long["deck"].astype(str) == deck]
+
+        plt.figure(figsize = (8, 6))
+
+        # Agent curve (solid)
+        sns.lineplot(
+            data = deck_agent,
+            x = "block",
+            y = "proportion",
+            color = deck_palette.get(deck, "gray"),
+            label = "Agent",
+            lw = 2.5,
+            marker = "o"
+        )
+
+        # Human (IGT) curve (dashed)
+        sns.lineplot(
+            data = deck_igt,
+            x = "block",
+            y = "proportion",
+            color = deck_palette.get(deck, "gray"),
+            label = "Human",
+            lw = 2,
+            linestyle = "--",
+            marker = "s"
+        )
+
+        plt.title(f"Deck {deck}: Agent vs. Human Choice Proportion per Block")
+        plt.xlabel("Block (20 trials each)")
+        plt.ylabel("Deck Selection Proportion")
+        plt.legend(title="")
+        plt.ylim(0, 1)
+        plt.tight_layout()
+
+        fname = f"{output_path}/deck_{deck}_similarity.png"
+
+        plt.savefig(fname, dpi=300)
+        plt.close()

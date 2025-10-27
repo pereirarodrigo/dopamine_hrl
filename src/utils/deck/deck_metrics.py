@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from sklearn.metrics import mean_squared_error
 
 
 def assign_blocks(df: pd.DataFrame, n_blocks: int = 5) -> pd.DataFrame:
@@ -106,3 +107,56 @@ def compute_total_cumulative_reward(df: pd.DataFrame) -> pd.DataFrame:
         .sum()
         .reset_index(name = "total_reward")
     )
+
+
+def compute_blockwise_deck_analysis(agent_df: pd.DataFrame, igt_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Compute and plot block-wise deck choice proportions and similarity metrics.
+    """
+    # Determine total trials and number of blocks (default: 5)
+    n_trials = agent_df["trial"].max()
+    block_size = 20
+    n_blocks = int(np.ceil(n_trials / block_size))
+
+    # Assign block indices
+    agent_df["block"] = ((agent_df["trial"] - 1) // block_size) + 1
+    igt_df["block"] = ((igt_df["trial"] - 1) // block_size) + 1
+
+    # Aggregate deck-choice proportions per block
+    agent_block = (
+        agent_df.groupby(["block", "deck"])
+        .size().unstack(fill_value = 0)
+        .apply(lambda x: x / x.sum(), axis = 1)
+    )
+
+    igt_block = (
+        igt_df.groupby(["block", "deck"])
+        .size().unstack(fill_value = 0)
+        .apply(lambda x: x / x.sum(), axis = 1)
+    )
+
+    # Align deck columns just in case
+    agent_block, igt_block = agent_block.align(igt_block, join = "inner", axis = 1)
+
+    # Compute per-block similarity metrics
+    block_results = []
+
+    for block in range(1, n_blocks + 1):
+        if block not in agent_block.index or block not in igt_block.index:
+            continue
+
+        sim = agent_block.loc[block]
+        emp = igt_block.loc[block]
+
+        corr = sim.corr(emp)
+        rmse = np.sqrt(mean_squared_error(sim, emp))
+
+        block_results.append({
+            "block": block,
+            "correlation": corr,
+            "rmse": rmse
+        })
+
+    block_df = pd.DataFrame(block_results)
+
+    return block_df
