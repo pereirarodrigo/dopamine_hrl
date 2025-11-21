@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+.env
+.venv
+logs/
+dist/
+analysis/
+datasets/
+.git/

@@ -1,4 +1,5 @@
 import os
+import argparse
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -258,4 +259,17 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description = "Run dopamine-HRL simulations.")
+    parser.add_argument("--num_seeds", type = int, default = 10)
+    parser.add_argument("--agents_per_condition", type = int, default = 50)
+    parser.add_argument("--num_episodes", type = int, default = 10)
+    parser.add_argument("--trials_per_episode", type = int, default = 20)
+
+    args = parser.parse_args()
+
+    MODEL_CONFIG["experiment_params"]["num_seeds"] = args.num_seeds
+    MODEL_CONFIG["experiment_params"]["agents_per_condition"] = args.agents_per_condition
+    MODEL_CONFIG["experiment_params"]["num_episodes"] = args.num_episodes
+    MODEL_CONFIG["experiment_params"]["trials_per_episode"] = args.trials_per_episode
+
     main()

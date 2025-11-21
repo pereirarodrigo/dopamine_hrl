@@ -1,4 +1,5 @@
 import os
+import argparse
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -209,10 +210,18 @@ def main(baseline_agent_type: str = "random") -> None:
 
 
 if __name__ == "__main__":
-    # Run an experiment with the random agent
-    print(f"Starting baseline experiments with the random policy...")
-    main(baseline_agent_type = "random")
+    parser = argparse.ArgumentParser(description = "Run baseline simulations.")
+    parser.add_argument("--num_seeds", type = int, default = 10)
+    parser.add_argument("--agents_per_condition", type = int, default = 50)
+    parser.add_argument("--num_episodes", type = int, default = 10)
+    parser.add_argument("--trials_per_episode", type = int, default = 20)
+    parser.add_argument("--baseline_agent_type", type = str, choices = ["random", "flat_td"], default = "random")
 
-    # Run an experiment with the flat TD agent
-    print(f"\nStarting baseline experiments with the flat TD policy...")
-    main(baseline_agent_type = "flat_td")
+    args = parser.parse_args()
+
+    BASELINE_CONFIG["experiment_params"]["num_seeds"] = args.num_seeds
+    BASELINE_CONFIG["experiment_params"]["agents_per_condition"] = args.agents_per_condition
+    BASELINE_CONFIG["experiment_params"]["num_episodes"] = args.num_episodes
+    BASELINE_CONFIG["experiment_params"]["trials_per_episode"] = args.trials_per_episode
+
+    main(baseline_agent_type = args.baseline_agent_type)
