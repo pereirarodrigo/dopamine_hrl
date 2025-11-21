@@ -165,6 +165,10 @@ def plot_deck_analysis(agent_df: pd.DataFrame, igt_df: pd.DataFrame, output_path
         "D": "#3b82f6",  # blue
     }
 
+    # Map deck labels to characters to match IGT format
+    agent_long["deck"] = agent_long["deck"].map({0: "A", 1: "B", 2: "C", 3: "D"})
+    igt_long["deck"] = igt_long["deck"].map({0: "A", 1: "B", 2: "C", 3: "D"})
+
     # Iterate over decks (ensure deck labels are strings for safety)
     for deck in sorted(agent_long["deck"].astype(str).unique()):
         deck_agent = agent_long[agent_long["deck"].astype(str) == deck]
@@ -196,13 +200,13 @@ def plot_deck_analysis(agent_df: pd.DataFrame, igt_df: pd.DataFrame, output_path
         )
 
         plt.title(f"Deck {deck}: Agent vs. Human Choice Proportion per Block")
-        plt.xlabel("Block (20 trials each)")
+        plt.xlabel(f"Block")
         plt.ylabel("Deck Selection Proportion")
-        plt.legend(title="")
+        plt.legend(title = "")
         plt.ylim(0, 1)
         plt.tight_layout()
 
         fname = f"{output_path}/deck_{deck}_similarity.png"
 
-        plt.savefig(fname, dpi=300)
+        plt.savefig(fname, dpi = 300)
         plt.close()

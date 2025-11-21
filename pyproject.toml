@@ -1,0 +1,16 @@
+[project]
+name = "dopamine-hrl"
+version = "0.1.0"
+description = "Simulated dopaminergic signalling with hierarchical reinforcement learning"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "gymnasium==0.29.1",
+    "matplotlib==3.10.7",
+    "numpy==2.3.4",
+    "pandas==2.3.3",
+    "pyyaml==6.0.2",
+    "scikit-learn==1.7.2",
+    "seaborn==0.13.2",
+    "tqdm==4.67.1",
+]
