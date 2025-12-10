@@ -1,8 +1,10 @@
-<picture>
-  <source srcset="img/logo_dark.png" media="(prefers-color-scheme: dark)">
-  <source srcset="img/logo_light.png" media="(prefers-color-scheme: light)">
-  <img src="img/logo_light.png" width="350" height="150">
-</picture>
+<div align="center">
+    <picture>
+        <source srcset="img/logo_dark.png" media="(prefers-color-scheme: dark)">
+        <source srcset="img/logo_light.png" media="(prefers-color-scheme: light)">
+        <img src="img/logo_light.png" width="350" height="150">
+    </picture>
+</div>
 
 <br>
 
