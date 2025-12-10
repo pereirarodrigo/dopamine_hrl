@@ -9,7 +9,11 @@ The **Dopamine-HRL Research System**, or simply **D-HRL**, is a software suite t
 ## About
 
 This project is the culmination of my Master of Science (MSc) dissertation, "Simulating Risk-Based Decision-Making and Dopaminergic
-Dysfunctions Using Hierarchical Reinforcement Learning", undertaken at the University of Essex Online and supervised by [Professor Diego Navarra](https://www.linkedin.com/in/diego-navarra-800228/). The project aimed to investigate whether HRL, itself based on reinforcement learning (RL), could produce agents that generate responses similar to that of humans in risk or uncertain-based situations, with an emphasis on individuals with neurological disorders.
+Dysfunctions Using Hierarchical Reinforcement Learning", undertaken at the University of Essex Online and supervised by [Professor Diego Navarra](https://www.linkedin.com/in/diego-navarra-800228/). The project aimed to investigate whether a biologically inspired HRL model, itself based on reinforcement learning (RL), would:
+
+* Produce agents that generate responses reasonably similar to that of humans in risk or uncertain-based situations
+* Capture the impact of simulated dopamine depletion or overactivity in decision-making performance
+* Display better performance than traditional, non-hierarchical RL approaches
 
 It was released to the public as a gesture of support for open-source systems and general open science, and also out of a desire to contribute to advancements in neuroscience, cognitive science, and artificial intelligence (AI). Therefore, it remains fully open to modifications, improvements, extensions, and further research efforts.
 
