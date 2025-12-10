@@ -3,10 +3,5 @@ __pycache__/
 *.pyo
 *.pyd
 *.db
-.env
-.venv
-logs/
 dist/
-analysis/
-datasets/
 .git/

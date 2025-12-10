@@ -1,0 +1,2 @@
+reward_mse_mean,deck_mse_mean,t_stat_reward,p_reward,p_reward_bonferroni,cohen_d_reward,t_stat_deck,p_deck,p_deck_bonferroni,cohen_d_deck,n_agents,n_trials_total
+69668.5,3.59184,13.557517688227438,9.095719130864208e-42,1.8191438261728416e-41,0.1212621246281294,-108.20015036528706,0.0,0.0,-0.9677715655699222,50,25000

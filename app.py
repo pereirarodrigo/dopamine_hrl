@@ -29,7 +29,7 @@ os.makedirs(behavioural_output_dir, exist_ok = True)
 
 def run_script(script_path: str, args: list = None) -> None:
     """
-    Utility to execute scripts and stream logs
+    Utility to execute scripts and stream logs.
     """
     args = args or []
     cmd = ["uv", "run", "python", "-m", script_path, *map(str, args)]
@@ -102,7 +102,7 @@ with tabs[1]:
     col1, col2 = st.columns(2, gap = None)
 
     with col1:
-        if st.button("▶ Run Random Policy", key="random"):
+        if st.button("▶ Run Random Policy", key = "random"):
             args = [
                 f"--num_seeds={num_seeds}",
                 f"--agents_per_condition={agents_per_condition}",
@@ -114,7 +114,7 @@ with tabs[1]:
             st.markdown("Simulation completed.")
 
     with col2:
-        if st.button("▶ Run Flat TD Policy", key="flat_td"):
+        if st.button("▶ Run Flat TD Policy", key = "flat_td"):
             args = [
                 f"--num_seeds={num_seeds}",
                 f"--agents_per_condition={agents_per_condition}",
@@ -145,6 +145,7 @@ with tabs[2]:
             df = pd.read_csv(csv_path)
             num_cols = df.select_dtypes(include = ["float"]).columns
 
+            # Format numerical columns (except reward_mse_mean) for better readability
             for col in num_cols:
                 if col != "reward_mse_mean":
                     df[col] = df[col].apply(
@@ -183,6 +184,7 @@ with tabs[3]:
             df = pd.read_csv(csv_path)
             num_cols = df.select_dtypes(include = ["float"]).columns
 
+            # Ditto formatting
             for col in num_cols:
                 if col != "reward_mse_mean":
                     df[col] = df[col].apply(

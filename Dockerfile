@@ -6,10 +6,10 @@ WORKDIR /app
 
 # Copy project files
 COPY pyproject.toml uv.lock README.md ./
-COPY src ./src
 COPY datasets ./datasets
 COPY analysis ./analysis
-COPY main.py ./
+COPY src ./src
+COPY app.py ./
 
 # Install dependencies using uv
 RUN uv sync --frozen
@@ -23,4 +23,4 @@ ENV PYTHONUNBUFFERED=1 \
 EXPOSE 8501
 
 # Run the application
-CMD ["uv", "run", "python", "-m", "app", "--server.port=8501", "--server.address=0.0.0.0"]
+CMD ["uv", "run", "streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]

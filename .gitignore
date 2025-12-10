@@ -1,4 +1,2 @@
 src/**/__pycache__
-analysis/**
-logs/**
 datasets/**
