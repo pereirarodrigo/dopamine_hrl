@@ -35,7 +35,7 @@ Before doing anything, make sure to download the data from [Steingroever et al. 
 
 To run the system itself, you have two available options: Docker, or a local web interface. 
 
-### Docker Path
+### Running via Docker
 
 Docker is the most straightforward path given it builds app images that are self-contained, though it does necessitate that you have Docker installed beforehand. To run the system as a Docker image, run the following command:
 
@@ -51,7 +51,7 @@ docker run -it -p 8501:8501 <app_image_name>
 
 After this, the web interface should be accessible at https://localhost:8501 and the system should be ready for use.
 
-### Local Path
+### Running Locally
 
 Should you wish, however, to run the system locally, please take note of the following steps:
 
