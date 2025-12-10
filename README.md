@@ -1,15 +1,8 @@
-<style>
-@media (prefers-color-scheme: dark) {
-    img.dark-invert {
-        filter: invert(1) hue-rotate(180deg);
-    }
-}
-</style>
-
-<div align="center">
-    <img class="dark-invert" src="img/logo.png" width="350px" height="150px">
-</div>
-
+<picture>
+  <source srcset="img/logo_dark.png" media="(prefers-color-scheme: dark)">
+  <source srcset="img/logo_light.png" media="(prefers-color-scheme: light)">
+  <img src="img/logo_light.png" width="350" height="150">
+</picture>
 
 <br>
 
